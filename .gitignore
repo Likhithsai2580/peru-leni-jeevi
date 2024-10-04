@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Discord Bot
+.env
+chat_history
+
 # C extensions
 *.so
 
