@@ -223,4 +223,4 @@ async def on_message(message):
                 await message.channel.send(f"{ASSISTANT_NAME}: I apologize, but an error occurred. Please try again.")
 
 # Run the bot
-bot.run(os.environ("DISCORD_BOT_TOKEN"))
+bot.run(os.environ.get("DISCORD_BOT_TOKEN"))
