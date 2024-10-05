@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class DeepSeekAPI:
     """A class to interact with the DeepSeek API for asynchronous chat sessions."""
 
-    def __init__(self, api_token: Optional[str] = os.environ.get("DEEPSEEK")):
+    def __init__(self, api_token: Optional[str] = os.environ.get("DEEPSEEK", "").strip()):
         self.auth_headers = {'Authorization': f'Bearer {api_token}'}
         self.api_base_url = 'https://chat.deepseek.com/api/v0/chat'
         self.session: Optional[aiohttp.ClientSession] = None
