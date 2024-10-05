@@ -132,19 +132,27 @@ async def handle_coder_response(query: str, system_prompt: str) -> Tuple[str, st
     max_iterations = 5
 
     for _ in range(max_iterations):
-        deepseek_prompt = f"{ASSISTANT_NAME}, generate or optimize the code.\nHuman Query: {last_query}\nPrevious Code (if any): {last_code}\nResponse:"
-        deepseek_response = await deepseek_api.generate(user_message=deepseek_prompt, model_type="deepseek_code")
+        try:
+            deepseek_prompt = f"{ASSISTANT_NAME}, generate or optimize the code.\nHuman Query: {last_query}\nPrevious Code (if any): {last_code}\nResponse:"
+            deepseek_response = await deepseek_api.generate(user_message=deepseek_prompt, model_type="deepseek_code")
 
-        claude_prompt = f"Analyze the code and suggest improvements. Respond with 'COMPLETE' if optimal.\nUser Query: {last_query}\nCode: {deepseek_response}\nResponse:"
-        claude_response = await editee_generate(claude_prompt, model="claude", stream=False)
+            claude_prompt = f"Analyze the code and suggest improvements. Respond with 'COMPLETE' if optimal.\nUser Query: {last_query}\nCode: {deepseek_response}\nResponse:"
+            claude_response = await editee_generate(claude_prompt, model="claude", stream=False)
 
-        if "complete" in claude_response.lower():
-            return query, deepseek_response
-        last_query = claude_response
-        last_code = deepseek_response
+            if "complete" in claude_response.lower():
+                return query, deepseek_response
+            last_query = claude_response
+            last_code = deepseek_response
+        except Exception as e:
+            logger.error(f"Error in handle_coder_response: {str(e)}")
+            return query, f"An error occurred while processing your request: {str(e)}"
 
-    final_response = await deepseek_api.generate(user_message=f"Generate the final, optimized code.\nQuery: {last_query}\nCode: {last_code}", model_type="deepseek_code")
-    return query, final_response
+    try:
+        final_response = await deepseek_api.generate(user_message=f"Generate the final, optimized code.\nQuery: {last_query}\nCode: {last_code}", model_type="deepseek_code")
+        return query, final_response
+    except Exception as e:
+        logger.error(f"Error in handle_coder_response final generation: {str(e)}")
+        return query, f"An error occurred while generating the final response: {str(e)}"
 
 # Initialize Discord bot
 intents = discord.Intents.default()
