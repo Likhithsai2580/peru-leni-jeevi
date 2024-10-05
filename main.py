@@ -80,7 +80,7 @@ async def select_llm(query: str) -> str:
 
     response = await editee_generate(classification_prompt, model="gpt4", stream=False)
     response = response.strip().lower()
-
+    logger.info(f"Classification response: {response}")
     if "mathematical" in response:
         return "deepseek chat"
     elif "programming" in response:
@@ -89,6 +89,7 @@ async def select_llm(query: str) -> str:
         return "gemini"
     else:
         return "gpt4"
+
 
 def is_mathematical_question(query: str) -> bool:
     math_keywords = [
@@ -106,18 +107,22 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
 
     try:
         if llm == "deepseek chat":
+            logger.info(f"Generating response for mathematical question: {is_mathematical_question(query)}")
             if is_mathematical_question(query):
                 response = await deepseek_api.generate(user_message=query, model_type="deepseek_chat")
             else:
                 response = await editee_generate(query, model="gpt4", system_prompt=system_prompt, history=history_prompt)
 
         elif llm == "coder":
+            logger.info(f"Generating response for coder: {llm}")
             return await handle_coder_response(query, system_prompt)
 
         elif llm == "gemini":
+            logger.info(f"Generating response for gemini: {llm}")
             response = await real_time(query, system_prompt=system_prompt, web_access=True, stream=True)
 
         else:
+            logger.info(f"Generating response for gpt4: {llm}")
             response = await editee_generate(query, model=llm, system_prompt=system_prompt, history=history_prompt)
 
         return query, response
@@ -135,10 +140,10 @@ async def handle_coder_response(query: str, system_prompt: str) -> Tuple[str, st
         try:
             deepseek_prompt = f"{ASSISTANT_NAME}, generate or optimize the code.\nHuman Query: {last_query}\nPrevious Code (if any): {last_code}\nResponse:"
             deepseek_response = await deepseek_api.generate(user_message=deepseek_prompt, model_type="deepseek_code")
-
+            logger.info(f"DeepSeek response: {deepseek_response}")
             claude_prompt = f"Analyze the code and suggest improvements. Respond with 'COMPLETE' if optimal.\nUser Query: {last_query}\nCode: {deepseek_response}\nResponse:"
             claude_response = await editee_generate(claude_prompt, model="claude", stream=False)
-
+            logger.info(f"Claude response: {claude_response}")
             if "complete" in claude_response.lower():
                 return query, deepseek_response
             last_query = claude_response
