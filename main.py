@@ -10,10 +10,10 @@ from llm.deepseek import DeepSeekAPI
 import aiofiles
 import logging
 from discord.ext import tasks
-
 load_dotenv()
 
 CHAT_HISTORY_FOLDER = "chat_history"
+CHAT_SUMMARY_FOLDER = "chat_summaries"
 ASSISTANT_NAME = "Peru Leni Jeevi"
 DEVELOPER_NAME = "Likhith Sai (likhithsai2580 on GitHub)"
 FORUM_CHANNEL_ID_FILE = "forum_channel_id.json"
@@ -28,9 +28,30 @@ logger.addHandler(handler)
 
 # Ensure the chat history folder exists
 os.makedirs(CHAT_HISTORY_FOLDER, exist_ok=True)
+os.makedirs(CHAT_SUMMARY_FOLDER, exist_ok=True)
 
 # Create a singleton instance of DeepSeekAPI
 deepseek_api = DeepSeekAPI()
+
+# Summarization task
+async def summarize_chat_history(filepath: str) -> str:
+    history = await load_chat_history(filepath)
+    if not history:
+        return ""
+    
+    # Construct the conversation to summarize
+    conversation = "\n".join([f"User: {user}\n{ASSISTANT_NAME}: {ai}" for user, ai in history])
+    
+    summarization_prompt = f"""As {ASSISTANT_NAME}, please provide a concise summary of the following conversation:
+
+{conversation}
+
+Summary:"""
+    
+    summary = await editee_generate(summarization_prompt, model="gpt4", stream=False)
+    summary = summary.strip()
+    logger.info(f"Summarization result for {filepath}: {summary}")
+    return summary
 
 async def load_chat_history(filepath: str) -> List[Tuple[str, str]]:
     if not os.path.exists(filepath):
@@ -54,6 +75,7 @@ async def load_chat_history(filepath: str) -> List[Tuple[str, str]]:
             logger.warning(f"Incomplete entry found in chat history at line {i+1}")
     return history
 
+
 async def save_chat_history(history: List[Tuple[str, str]], filepath: str):
     async with aiofiles.open(filepath, "w") as f:
         for user, ai in history:
@@ -63,6 +85,21 @@ async def save_chat_history(history: List[Tuple[str, str]], filepath: str):
             else:
                 logger.warning(f"Skipping incomplete entry: User: {user}, AI: {ai}")
 
+async def append_summary_to_history(filepath: str, summary: str):
+    summary_file = os.path.join(CHAT_SUMMARY_FOLDER, f"summary_{filepath}")
+    async with aiofiles.open(summary_file, "w") as f:
+        await f.write(f"Summary: {summary}\n")
+    logger.info(f"Summary appended to {summary_file}")
+
+@tasks.loop(hours=1)
+async def periodic_summarization():
+    for filename in os.listdir(CHAT_HISTORY_FOLDER):
+        if filename.endswith(".txt"):
+            filepath = os.path.join(CHAT_HISTORY_FOLDER, filename)
+            summary = await summarize_chat_history(filepath)
+            if summary:
+                await append_summary_to_history(filepath, summary)
+        
 def handle_error(e: Exception) -> str:
     logger.error(f"Error occurred: {str(e)}", exc_info=True)
     return f"An error occurred: {str(e)}. Please try again."
@@ -101,35 +138,38 @@ def is_mathematical_question(query: str) -> bool:
 
 async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) -> Tuple[str, str]:
     valid_chat_history = [(user, ai) for entry in chat_history if isinstance(entry, tuple) and len(entry) == 2 for user, ai in [entry]]
-    history_prompt = "\n".join([f"Human: {user}\n{ASSISTANT_NAME}: {ai}" for user, ai in valid_chat_history[-5:]])
+    # Load full or last N entries from history
+    last_n = 10  # You can adjust this number based on your needs
+    history_prompt = "\n".join([f"Human: {user}\n{ASSISTANT_NAME}: {ai}" for user, ai in valid_chat_history[-last_n:]])
 
-    system_prompt = f"You are {ASSISTANT_NAME}, developed by {DEVELOPER_NAME}, an advanced AI assistant designed to handle diverse topics. Respond to the user's query with accurate and helpful information."
+    system_prompt = f"""
+    You are {ASSISTANT_NAME}, developed by {DEVELOPER_NAME}, an advanced AI assistant designed to handle diverse topics.
+    Below is the conversation history:
+    {history_prompt}
+    Respond to the user's current query with accurate and helpful information.
+    """
 
     try:
         if llm == "deepseek chat":
             logger.info(f"Generating response for mathematical question: {is_mathematical_question(query)}")
-            if is_mathematical_question(query):
-                response = await deepseek_api.generate(user_message=query, model_type="deepseek_chat")
-            else:
-                response = await editee_generate(query, model="gpt4", system_prompt=system_prompt, history=history_prompt)
-
+            response = await deepseek_api.generate(user_message=system_prompt + f"\nUser: {query}\n{ASSISTANT_NAME}:", model_type="deepseek_chat")
+        
         elif llm == "coder":
-            logger.info(f"Generating response for coder: {llm}")
-            return await handle_coder_response(query, system_prompt)
+            logger.info("Handling coding response.")
+            response = await handle_coder_response(query, chat_history)
 
         elif llm == "gemini":
-            logger.info(f"Generating response for gemini: {llm}")
-            response = await real_time(query, system_prompt=system_prompt, web_access=True, stream=True)
+            logger.info("Handling real-time response.")
+            response = await real_time(query)
 
         else:
-            logger.info(f"Generating response for gpt4: {llm}")
-            response = await editee_generate(query, model=llm, system_prompt=system_prompt, history=history_prompt)
+            logger.info("Generating general GPT-4 response.")
+            response = await editee_generate(system_prompt + f"\nUser: {query}\n{ASSISTANT_NAME}:", model="gpt4", stream=False)
 
         return query, response
 
     except Exception as e:
-        logger.error(f"Error in get_llm_response: {str(e)}", exc_info=True)
-        return query, handle_error(e)
+        return query, await handle_error(e)
 
 async def handle_coder_response(query: str, system_prompt: str) -> Tuple[str, str]:
     last_query = query
@@ -183,10 +223,12 @@ async def on_ready():
     await tree.sync()
     logger.info(f"Logged in as {bot.user.name} and synced slash commands.")
     keep_alive.start()
+    periodic_summarization.start()
 
 @tasks.loop(minutes=5)
 async def keep_alive():
     logger.info("Keeping the bot alive...")
+
 
 @tree.command(name="set_forum_channel", description="Set the forum channel for Peru Leni Jeevi to monitor (Admin only)")
 @commands.has_permissions(administrator=True)
