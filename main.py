@@ -99,7 +99,7 @@ def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) 
         [f"Human: {user}\n{ASSISTANT_NAME}: {ai}" for user, ai in valid_chat_history[-5:]]
     )
 
-    system_prompt = f"You are {ASSISTANT_NAME}, an advanced AI assistant designed to handle diverse topics. Respond to the user's query with accurate and helpful information."
+    system_prompt = f"You are {ASSISTANT_NAME}, Developed By Likhith Sai, an advanced AI assistant designed to handle diverse topics. Respond to the user's query with accurate and helpful information."
 
     if llm == "deepseek chat":
         if is_mathematical_question(query):
@@ -119,14 +119,14 @@ def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) 
         max_iterations = 5
 
         for _ in range(max_iterations):
-            deepseek_prompt = f"""{ASSISTANT_NAME}, analyze the user query and generate or optimize the code as per the requirements.
+            deepseek_prompt = f"""{ASSISTANT_NAME}, Developed By Likhith Sai analyze the user query and generate or optimize the code as per the requirements.
             \nHuman Query: {last_query}
             \nPrevious Code (if provided):{last_code}
             \n{ASSISTANT_NAME} Response:"""
             try:
                 deepseek_response = deepseek_api.generate(user_message=deepseek_prompt, model_type="deepseek_code", verbose=False)
 
-                claude_prompt = f"""{ASSISTANT_NAME}, as a code review expert, analyze the provided code and suggest improvements, optimizations, or additional features. If all requested features are implemented and the code is optimal, respond with "COMPLETE."
+                claude_prompt = f"""{ASSISTANT_NAME},  Developed By Likhith Sai, as a code review expert, analyze the provided code and suggest improvements, optimizations, or additional features. If all requested features are implemented and the code is optimal, respond with "COMPLETE."
                 \nUser Query: {last_query}
                 \nCode:{deepseek_response}
                 \n{ASSISTANT_NAME} Response:"""
@@ -164,8 +164,8 @@ def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) 
             except Exception as e:
                 response = f"I apologize, but an error occurred while generating the response. Error: {str(e)}"
 
-    chat_history.append((query, str(response)))
-    return query, response
+        chat_history.append((query, str(response)))
+        return query, response
     elif llm == "gemini":
         response = real_time(query, system_prompt=system_prompt, web_access=True, stream=True)
         return query, response
