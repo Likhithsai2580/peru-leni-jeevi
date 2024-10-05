@@ -111,10 +111,61 @@ def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) 
             )
             return query, response
     elif llm == "coder":
-        response = editee_generate(
-            query, model="gpt4", system_prompt=system_prompt, history=history_prompt
-        )
-        return query, response
+        deepseek_api = DeepSeekAPI()
+        claude_api = lambda prompt: editee_generate(prompt, model="claude", stream=False)
+
+        last_query = query
+        last_code = ""
+        max_iterations = 5
+
+        for _ in range(max_iterations):
+            deepseek_prompt = f"""{ASSISTANT_NAME}, analyze the user query and generate or optimize the code as per the requirements.
+            \nHuman Query: {last_query}
+            \nPrevious Code (if provided):{last_code}
+            \n{ASSISTANT_NAME} Response:"""
+            try:
+                deepseek_response = deepseek_api.generate(user_message=deepseek_prompt, model_type="deepseek_code", verbose=False)
+
+                claude_prompt = f"""{ASSISTANT_NAME}, as a code review expert, analyze the provided code and suggest improvements, optimizations, or additional features. If all requested features are implemented and the code is optimal, respond with "COMPLETE."
+                \nUser Query: {last_query}
+                \nCode:{deepseek_response}
+                \n{ASSISTANT_NAME} Response:"""
+                claude_response = claude_api(claude_prompt)
+
+                if "COMPLETE" in str(claude_response):
+                    response = deepseek_response
+                    break
+                else:
+                    last_query = claude_response
+                    last_code = deepseek_response
+            except Exception as e:
+                print(f"Ran into error {e}")
+                break
+
+        if 'response' not in locals():
+            try:
+                response = deepseek_api.generate(user_message=f"{system_prompt}\n\nGenerate the final, optimized code based on the following query:\n\nHuman: {last_query}\n\nPrevious code:\n{last_code}\n\n{ASSISTANT_NAME}:", model_type="deepseek_code", verbose=False)
+            except Exception as e:
+                response = f"I apologize, but an error occurred while generating the code. Error: {str(e)}"
+    else:
+        max_chunk_size = 7500  # Leave some room for the system prompt
+        if len(full_prompt) > max_chunk_size:
+            chunks = [full_prompt[i:i+max_chunk_size] for i in range(0, len(full_prompt), max_chunk_size)]
+            response = ""
+            for chunk in chunks:
+                try:
+                    chunk_response = editee_generate(chunk, model=llm, stream=False)
+                    response += str(chunk_response) + " "
+                except Exception as e:
+                    print(f"Error occurred while processing chunk: {str(e)}. Skipping...")
+        else:
+            try:
+                response = editee_generate(full_prompt, model=llm, stream=False)
+            except Exception as e:
+                response = f"I apologize, but an error occurred while generating the response. Error: {str(e)}"
+
+    chat_history.append((query, str(response)))
+    return query, response
     elif llm == "gemini":
         response = real_time(query, system_prompt=system_prompt, web_access=True, stream=True)
         return query, response
@@ -203,16 +254,16 @@ async def on_message(message):
 
             try:
                 bot_response = main(user_query=user_input, history_file_name=history_file_name)
-                
+
                 if len(bot_response) > 1900:
                     # Create a text file with the response
                     file_name = f"response_{message.id}.txt"
                     with open(file_name, "w", encoding="utf-8") as file:
                         file.write(bot_response)
-                    
+
                     # Send the response as a file attachment
                     await message.channel.send(f"{ASSISTANT_NAME}: The response is too long. Please find it in the attached file.", file=discord.File(file_name))
-                    
+
                     # Delete the temporary file
                     os.remove(file_name)
                 else:
