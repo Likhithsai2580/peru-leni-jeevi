@@ -166,7 +166,7 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
             logger.info("Handling real-time response.")
             response = await real_time(query)
 
-        elif llm="uncensored":
+        elif llm=="uncensored":
             logger.info("Handling uncensored response")
             response = await uncensored_response(query)
 
