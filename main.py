@@ -5,6 +5,7 @@ from typing import Optional, List, Tuple
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
+from llm.whiterabbit import response as uncensored_response
 from llm.Editee import generate as editee_generate, real_time
 from llm.deepseek import DeepSeekAPI
 import aiofiles
@@ -111,6 +112,7 @@ async def select_llm(query: str) -> str:
     Programming: Questions related to coding, algorithms, or debugging.
     General: Queries about general knowledge or conversational topics.
     Realtime: Questions needing current information or when the LLM may not have knowledge on the topic.
+    Censored: If question is illegal return this classification including game hacks etc 
     User Query: "{query}"
 
     Respond with only the category name, e.g., "Mathematical" or "Programming"."""
@@ -124,6 +126,8 @@ async def select_llm(query: str) -> str:
         return "coder"
     elif "realtime" in response:
         return "gemini"
+    elif "censored" in response:
+        return "uncensored"
     else:
         return "gpt4"
 
@@ -161,6 +165,10 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
         elif llm == "gemini":
             logger.info("Handling real-time response.")
             response = await real_time(query)
+
+        elif llm="uncensored":
+            logger.info("Handling uncensored response")
+            response = await uncensored_response(query)
 
         else:
             logger.info("Generating general GPT-4 response.")
