@@ -2,7 +2,7 @@ import httpx
 import asyncio
 import os
 import json
-headers = os.environ.get("HEADERS")
+headers = json.loads(os.environ.get("HEADERS", "{}"))
 
 # Define your async function
 async def response(message_content, message_id="flTSP0c", enhance_prompt=False, use_functions=False):
