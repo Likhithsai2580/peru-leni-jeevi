@@ -2,7 +2,13 @@ import httpx
 import asyncio
 import os
 import json
-headers = json.loads(os.environ.get("HEADERS", "{}"))
+headers = os.environ.get("HEADERS", "")
+print(str(headers))
+try:
+    headers = json.loads(headers)
+except:
+    print(f"Failed to decode JSON from HEADERS: {e}. Value: {headers_str}")
+    headers = {}  # Fallback to empty headers    
 
 # Define your async function
 async def response(message_content, message_id="flTSP0c", enhance_prompt=False, use_functions=False):
