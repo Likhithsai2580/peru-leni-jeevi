@@ -101,7 +101,7 @@ async def periodic_summarization():
             if summary:
                 await append_summary_to_history(filepath, summary)
         
-def handle_error(e: Exception) -> str:
+async def handle_error(e: Exception) -> str:
     logger.error(f"Error occurred: {str(e)}", exc_info=True)
     return f"An error occurred: {str(e)}. Please try again."
 
@@ -177,7 +177,8 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
         return query, response
 
     except Exception as e:
-        return query, await handle_error(e)
+        error_message = await handle_error(e)
+        return query, error_message
 
 async def handle_coder_response(query: str, system_prompt: str) -> Tuple[str, str]:
     last_query = query
