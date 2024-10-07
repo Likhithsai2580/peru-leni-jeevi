@@ -2,13 +2,17 @@ import httpx
 import asyncio
 import os
 import json
-headers = os.environ.get("HEADERS", "")
-print(str(headers))
+
+# Get the HEADERS environment variable
+headers_str = os.environ.get("HEADERS", "")
+print(f"Raw HEADERS: '{headers_str[:100]}'...")  # Debugging
+
+# Attempt to load headers from the environment variable
 try:
-    headers = json.loads(headers)
-except:
-    print(f"Failed to decode JSON from HEADERS: {e}. Value: {headers_str}")
-    headers = {}  # Fallback to empty headers    
+    headers = json.loads(headers_str)
+except json.JSONDecodeError as e:
+    print(f"Failed to decode JSON from HEADERS: {e}. Value: '{headers_str}'")
+    headers = {}  # Fallback to empty headers
 
 # Define your async function
 async def response(message_content, message_id="flTSP0c", enhance_prompt=False, use_functions=False):
@@ -40,4 +44,3 @@ async def main(prompt):
 
 if __name__ == "__main__":
     asyncio.run(main("make an interesting game in python"))
-
