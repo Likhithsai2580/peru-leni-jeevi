@@ -4,6 +4,8 @@ import json
 import logging
 import chardet
 import os
+from dotenv import load_dotenv
+load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
