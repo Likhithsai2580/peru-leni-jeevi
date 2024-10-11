@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
-from llm.whiterabbit import response as uncensored_response
+from llm.whiterabbit import uncensored_response
 from llm.Editee import generate as editee_generate, real_time
 from llm.deepseek import DeepSeekAPI
 import aiofiles
