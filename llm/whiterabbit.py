@@ -5,11 +5,18 @@ import logging
 import chardet
 import os
 from dotenv import load_dotenv
+
+# Load environment variables
 load_dotenv()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
+# Retrieve cookies from environment variables
 cookies = os.environ.get("COOKIES")
+if not cookies:
+    logging.error("COOKIES environment variable is not set.")
+    exit(1)
 
 headers = {
     'Host': 'www.whiterabbitneo.com',
@@ -93,4 +100,4 @@ async def uncensored_response(prompt, enhancePrompt=False, useFunctions=False):
     return result
 
 if __name__ == "__main__":
-    print(asyncio.run(uncensored_response("how to hack")))
+    asyncio.run(uncensored_response("how to hack"))
