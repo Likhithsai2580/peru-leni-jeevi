@@ -11,15 +11,29 @@ from llm.deepseek import DeepSeekAPI
 import aiofiles
 import logging
 from discord.ext import tasks
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory, jsonify
 import threading
-load_dotenv()
+import zipfile
+import shutil
+import subprocess
+import tensorflow as tf
+from transformers import T5Tokenizer, T5ForConditionalGeneration, Trainer, TrainingArguments, pipeline
+from datasets import Dataset
+import nltk
+from nltk.corpus import wordnet
+import nlpaug.augmenter.word as naw
+from googletrans import Translator
+import torch
+
+nltk.download('wordnet')
 
 CHAT_HISTORY_FOLDER = "chat_history"
 CHAT_SUMMARY_FOLDER = "chat_summaries"
 ASSISTANT_NAME = "Peru Leni Jeevi"
 DEVELOPER_NAME = "Likhith Sai (likhithsai2580 on GitHub)"
 FORUM_CHANNEL_ID_FILE = "forum_channel_id.json"
+FRONTEND_DIR = "frontend"
+ZIP_FILE_NAME = "peru_leni_jeevi.zip"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +46,7 @@ logger.addHandler(handler)
 # Ensure the chat history folder exists
 os.makedirs(CHAT_HISTORY_FOLDER, exist_ok=True)
 os.makedirs(CHAT_SUMMARY_FOLDER, exist_ok=True)
+os.makedirs(FRONTEND_DIR, exist_ok=True)
 
 # Create a singleton instance of DeepSeekAPI
 deepseek_api = DeepSeekAPI()
@@ -41,16 +56,16 @@ async def summarize_chat_history(filepath: str) -> str:
     history = await load_chat_history(filepath)
     if not history:
         return ""
-    
+
     # Construct the conversation to summarize
     conversation = "\n".join([f"User: {user}\n{ASSISTANT_NAME}: {ai}" for user, ai in history])
-    
+
     summarization_prompt = f"""As {ASSISTANT_NAME}, please provide a concise summary of the following conversation:
 
 {conversation}
 
 Summary:"""
-    
+
     summary = await editee_generate(summarization_prompt, model="gpt4", stream=False)
     summary = summary.strip()
     logger.info(f"Summarization result for {filepath}: {summary}")
@@ -102,7 +117,7 @@ async def periodic_summarization():
             summary = await summarize_chat_history(filepath)
             if summary:
                 await append_summary_to_history(filepath, summary)
-        
+
 async def handle_error(e: Exception) -> str:
     logger.error(f"Error occurred: {str(e)}", exc_info=True)
     return f"An error occurred: {str(e)}. Please try again."
@@ -114,7 +129,7 @@ async def select_llm(query: str) -> str:
     Programming: Questions related to coding, algorithms, or debugging.
     General: Queries about general knowledge or conversational topics.
     Realtime: Questions needing current information or when the LLM may not have knowledge on the topic.
-    Censored: If question is illegal return this classification including game hacks etc 
+    Censored: If question is illegal return this classification including game hacks etc
     User Query: "{query}"
 
     Respond with only the category name, e.g., "Mathematical" or "Programming"."""
@@ -142,73 +157,89 @@ def is_mathematical_question(query: str) -> bool:
     math_symbols = set("+-*/^√∫∑∏≈≠≤≥angle∠πεδ")
     return any(keyword in query.lower() for keyword in math_keywords) or any(symbol in query for symbol in math_symbols)
 
+def augment_data(text):
+    aug = naw.SynonymAug(aug_src='wordnet')
+    augmented_text = aug.augment(text)
+    return augmented_text
+
+def back_translate(text):
+    translator = Translator()
+    try:
+        translated = translator.translate(text, dest='fr')
+        back_translated = translator.translate(translated.text, dest='en')
+        return back_translated.text
+    except Exception as e:
+        logger.error(f"Error during back-translation: {e}")
+        return text
+
+async def train_model(training_data: List[str]):
+    logger.info("Training model with provided data...")
+
+    tokenizer = T5Tokenizer.from_pretrained('t5-base')
+
+    def preprocess_function(examples):
+        inputs = [f"train: {example}" for example in examples["text"]]
+        model_inputs = tokenizer(inputs, max_length=128, padding="max_length", truncation=True)
+        return model_inputs
+
+    dataset = Dataset.from_dict({"text": training_data})
+    tokenized_datasets = dataset.map(preprocess_function, batched=True)
+
+    augmented_data = []
+    for text in training_data:
+        augmented_data.append(augment_data(text))
+        augmented_data.append(back_translate(text))
+
+    augmented_dataset = Dataset.from_dict({"text": augmented_data})
+    augmented_tokenized_datasets = augmented_dataset.map(preprocess_function, batched=True)
+
+    tokenized_datasets = tokenized_datasets.concatenate(augmented_tokenized_datasets)
+
+    model = T5ForConditionalGeneration.from_pretrained('t5-base')
+
+    training_args = TrainingArguments(
+        output_dir="./results",
+        per_device_train_batch_size=32,
+        num_train_epochs=3,
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
+        logging_dir="./logs",
+        fp16=True, # Enable mixed precision training if your GPU supports it
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_datasets,
+        eval_dataset=tokenized_datasets, # Placeholder for evaluation dataset
+    )
+
+    trainer.train()
+    trainer.save_model("./trained_model")
+    logger.info("Model training completed.")
+
+def load_llm():
+    try:
+        logger.info("Loading pre-trained model...")
+        tokenizer = T5Tokenizer.from_pretrained('t5-base')
+        model = T5ForConditionalGeneration.from_pretrained("./trained_model")
+        generator = pipeline('text2text-generation', model=model, tokenizer=tokenizer, device=0 if torch.cuda.is_available() else -1)
+        return generator
+    except Exception as e:
+        logger.error(f"Error loading model: {e}")
+        return None
+
 async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) -> Tuple[str, str]:
-    valid_chat_history = [(user, ai) for entry in chat_history if isinstance(entry, tuple) and len(entry) == 2 for user, ai in [entry]]
-    # Load full or last N entries from history
-    last_n = 10  # You can adjust this number based on your needs
-    history_prompt = "\n".join([f"Human: {user}\n{ASSISTANT_NAME}: {ai}" for user, ai in valid_chat_history[-last_n:]])
-
-    system_prompt = f"""
-    You are {ASSISTANT_NAME}, developed by {DEVELOPER_NAME}, an advanced AI assistant designed to handle diverse topics.
-    Below is the conversation history:
-    {history_prompt}
-    Respond to the user's current query with accurate and helpful information.
-    """
+    generator = load_llm()
+    if generator is None:
+        return query, "Error loading LLM"
 
     try:
-        if llm == "deepseek chat":
-            logger.info(f"Generating response for mathematical question: {is_mathematical_question(query)}")
-            response = await deepseek_api.generate(user_message=system_prompt + f"\nUser: {query}\n{ASSISTANT_NAME}:", model_type="deepseek_chat")
-        
-        elif llm == "coder":
-            logger.info("Handling coding response.")
-            response = await handle_coder_response(query, chat_history)
-
-        elif llm == "gemini":
-            logger.info("Handling real-time response.")
-            response = await real_time(query)
-
-        elif llm=="uncensored":
-            logger.info("Handling uncensored response")
-            response = await uncensored_response(query)
-
-        else:
-            logger.info("Generating general GPT-4 response.")
-            response = await editee_generate(system_prompt + f"\nUser: {query}\n{ASSISTANT_NAME}:", model="gpt4", stream=False)
-
+        response = generator(query, max_length=128, num_return_sequences=1)[0]['generated_text']
         return query, response
-
     except Exception as e:
-        error_message = await handle_error(e)
-        return query, error_message
-
-async def handle_coder_response(query: str, system_prompt: str) -> Tuple[str, str]:
-    last_query = query
-    last_code = ""
-    max_iterations = 5
-
-    for _ in range(max_iterations):
-        try:
-            deepseek_prompt = f"{ASSISTANT_NAME}, generate or optimize the code.\nHuman Query: {last_query}\nPrevious Code (if any): {last_code}\nResponse:"
-            deepseek_response = await deepseek_api.generate(user_message=deepseek_prompt, model_type="deepseek_code")
-            logger.info(f"DeepSeek response: {deepseek_response}")
-            claude_prompt = f"Analyze the code and suggest improvements. Respond with 'COMPLETE' if optimal.\nUser Query: {last_query}\nCode: {deepseek_response}\nResponse:"
-            claude_response = await editee_generate(claude_prompt, model="claude", stream=False)
-            logger.info(f"Claude response: {claude_response}")
-            if "complete" in claude_response.lower():
-                return query, deepseek_response
-            last_query = claude_response
-            last_code = deepseek_response
-        except Exception as e:
-            logger.error(f"Error in handle_coder_response: {str(e)}")
-            return query, f"An error occurred while processing your request: {str(e)}"
-
-    try:
-        final_response = await deepseek_api.generate(user_message=f"Generate the final, optimized code.\nQuery: {last_query}\nCode: {last_code}", model_type="deepseek_code")
-        return query, final_response
-    except Exception as e:
-        logger.error(f"Error in handle_coder_response final generation: {str(e)}")
-        return query, f"An error occurred while generating the final response: {str(e)}"
+        logger.error(f"Error generating response: {e}")
+        return query, f"An error occurred: {str(e)}"
 
 # Initialize Discord bot
 intents = discord.Intents.default()
@@ -258,11 +289,11 @@ async def start_convo(interaction: discord.Interaction):
 @tree.command(name="train", description="Train the LLM (Admin only)")
 @commands.has_permissions(administrator=True)
 async def train_llm(interaction: discord.Interaction):
-    await interaction.response.send_message("Training the LLM... (This is a placeholder)", ephemeral=True)
-    # Implement training LLM logic here
+    await interaction.response.send_message("Training the LLM... (This may take some time)", ephemeral=True)
     training_data = await load_training_data()
     await train_model(training_data)
     await interaction.followup.send("LLM training completed.", ephemeral=True)
+    await zip_files_and_share(interaction)
 
 async def load_training_data() -> List[str]:
     # Load training data from chat history
@@ -275,11 +306,6 @@ async def load_training_data() -> List[str]:
                 training_data.append(data)
     return training_data
 
-async def train_model(training_data: List[str]):
-    # Placeholder for training model logic
-    logger.info("Training model with provided data...")
-    await asyncio.sleep(5)  # Simulate training time
-    logger.info("Model training completed.")
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -334,21 +360,22 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     if os.listdir(CHAT_HISTORY_FOLDER):
-        return render_template('chat.html')
+        return render_template('index.html')
     else:
         return render_template('showcase.html')
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_input = request.form['user_input']
-    # Placeholder for chat logic
-    return f"User: {user_input}\nBot: This is a placeholder response."
-
-def run_flask_app():
-    app.run(port=5000)
+    user_input = request.json.get('message')
+    if user_input:
+        response = asyncio.run(main(user_input, "web_chat.txt"))
+        return jsonify({'response': response})
+    return jsonify({'error': 'No message provided'})
 
 # Run the bot and Flask app in separate threads
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask_app)
+    # Load the LLM before starting the bot
+    load_llm()
+    flask_thread = threading.Thread(target=lambda: app.run(debug=True, port=5000))
     flask_thread.start()
     bot.run(os.environ.get("DISCORD_BOT_TOKEN"))
