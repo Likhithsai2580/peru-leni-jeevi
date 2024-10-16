@@ -1,4 +1,3 @@
-import requests
 from typing import Union, Dict, Tuple, Optional
 import re
 import asyncio
