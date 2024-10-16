@@ -59,6 +59,15 @@ Peru Leni Jeevi is a versatile Discord bot designed to assist with a variety of 
 
 2. The bot will log in and start monitoring the specified forum channel for user queries.
 
+### Running the Website
+
+1. Start the Flask server:
+   ```bash
+   python main.py
+   ```
+
+2. Open your web browser and navigate to `http://localhost:5000` to view the redesigned UI.
+
 ## Usage
 
 - **Set Forum Channel**: Use the `/set_forum_channel` command to set the forum channel for the bot to monitor. This command requires administrator permissions.
