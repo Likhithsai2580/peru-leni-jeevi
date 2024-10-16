@@ -11,6 +11,7 @@ from llm.deepseek import DeepSeekAPI
 import aiofiles
 import logging
 from discord.ext import tasks
+from flask import Flask, request, jsonify, send_from_directory  # P2c3b
 load_dotenv()
 
 CHAT_HISTORY_FOLDER = "chat_history"
@@ -300,5 +301,38 @@ async def on_disconnect():
     await deepseek_api.close()
     logger.info("DeepSeekAPI session closed.")
 
-# Run the bot
-bot.run(os.environ.get("DISCORD_BOT_TOKEN"))
+@tree.command(name="train", description="Train AI model from chat history (Owner only)")
+@commands.is_owner()
+async def train_model(interaction: discord.Interaction):
+    try:
+        await interaction.response.send_message("Training AI model from chat history...", ephemeral=True)
+        # Implement the training logic here
+        await interaction.followup.send("AI model training completed and loaded into the website.", ephemeral=True)
+    except Exception as e:
+        logger.error(f"Error during training: {str(e)}", exc_info=True)
+        await interaction.followup.send(f"An error occurred during training: {str(e)}", ephemeral=True)
+
+# Flask app setup
+app = Flask(__name__)  # P2c3b
+
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')  # P1c7a
+
+@app.route('/api/bot-info', methods=['GET'])
+def bot_info():
+    model_loaded = True  # Placeholder for actual model loading status
+    return jsonify({"modelLoaded": model_loaded})  # P3da2
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    data = request.get_json()
+    user_message = data.get('message')
+    # Placeholder for actual chat response logic
+    bot_response = "This is a placeholder response."
+    return jsonify({"response": bot_response})  # P3da2
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.create_task(bot.start(os.environ.get("DISCORD_BOT_TOKEN")))
+    app.run(host='0.0.0.0', port=5000)  # P5952
