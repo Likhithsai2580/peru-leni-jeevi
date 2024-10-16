@@ -36,3 +36,36 @@
     transform: rotate(360deg);
   }
 }
+
+/* Custom styles for enhanced UI elements */
+input:focus {
+  outline: none;
+  box-shadow: 0 0 10px #719ECE;
+}
+
+button:focus {
+  outline: none;
+  box-shadow: 0 0 10px #719ECE;
+}
+
+.container {
+  transition: transform 0.3s ease-in-out;
+}
+
+.container:hover {
+  transform: scale(1.02);
+}
+
+/* Keyframes for animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 1s ease-in-out;
+}
