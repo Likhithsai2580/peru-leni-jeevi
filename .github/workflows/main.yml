@@ -1,4 +1,4 @@
-name: Run Discord Bot
+name: Run Discord Bot and Website
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  run-bot-and-website:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -28,9 +28,11 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DEEPSEEK: ${{ secrets.DEEPSEEK }}
           HEADERS: ${{ secrets.HEADERS }}
-      - name: Run bot
+      - name: Run bot and website
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DEEPSEEK: ${{ secrets.DEEPSEEK }}
           HEADERS: ${{ secrets.HEADERS }}
-        run: python main.py
+        run: |
+          nohup python main.py &
+          nohup python -m http.server 8000 &

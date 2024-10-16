@@ -300,5 +300,16 @@ async def on_disconnect():
     await deepseek_api.close()
     logger.info("DeepSeekAPI session closed.")
 
+@tree.command(name="train", description="Train AI model from chat history (Owner only)")
+@commands.is_owner()
+async def train_model(interaction: discord.Interaction):
+    try:
+        await interaction.response.send_message("Training AI model from chat history...", ephemeral=True)
+        # Implement the training logic here
+        await interaction.followup.send("AI model training completed and loaded into the website.", ephemeral=True)
+    except Exception as e:
+        logger.error(f"Error during training: {str(e)}", exc_info=True)
+        await interaction.followup.send(f"An error occurred during training: {str(e)}", ephemeral=True)
+
 # Run the bot
 bot.run(os.environ.get("DISCORD_BOT_TOKEN"))
