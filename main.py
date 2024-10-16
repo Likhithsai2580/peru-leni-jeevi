@@ -11,6 +11,8 @@ from llm.deepseek import DeepSeekAPI
 import aiofiles
 import logging
 from discord.ext import tasks
+from flask import Flask, render_template, request
+import threading
 load_dotenv()
 
 CHAT_HISTORY_FOLDER = "chat_history"
@@ -253,6 +255,32 @@ async def start_convo(interaction: discord.Interaction):
     else:
         await interaction.response.send_message(f"Hello! I am {ASSISTANT_NAME}. Please create a thread to start.", ephemeral=True)
 
+@tree.command(name="train", description="Train the LLM (Admin only)")
+@commands.has_permissions(administrator=True)
+async def train_llm(interaction: discord.Interaction):
+    await interaction.response.send_message("Training the LLM... (This is a placeholder)", ephemeral=True)
+    # Implement training LLM logic here
+    training_data = await load_training_data()
+    await train_model(training_data)
+    await interaction.followup.send("LLM training completed.", ephemeral=True)
+
+async def load_training_data() -> List[str]:
+    # Load training data from chat history
+    training_data = []
+    for filename in os.listdir(CHAT_HISTORY_FOLDER):
+        if filename.endswith(".txt"):
+            filepath = os.path.join(CHAT_HISTORY_FOLDER, filename)
+            async with aiofiles.open(filepath, "r") as f:
+                data = await f.read()
+                training_data.append(data)
+    return training_data
+
+async def train_model(training_data: List[str]):
+    # Placeholder for training model logic
+    logger.info("Training model with provided data...")
+    await asyncio.sleep(5)  # Simulate training time
+    logger.info("Model training completed.")
+
 @bot.event
 async def on_message(message: discord.Message):
     await bot.process_commands(message)
@@ -300,5 +328,27 @@ async def on_disconnect():
     await deepseek_api.close()
     logger.info("DeepSeekAPI session closed.")
 
-# Run the bot
-bot.run(os.environ.get("DISCORD_BOT_TOKEN"))
+# Flask app for website
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    if os.listdir(CHAT_HISTORY_FOLDER):
+        return render_template('chat.html')
+    else:
+        return render_template('showcase.html')
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_input = request.form['user_input']
+    # Placeholder for chat logic
+    return f"User: {user_input}\nBot: This is a placeholder response."
+
+def run_flask_app():
+    app.run(port=5000)
+
+# Run the bot and Flask app in separate threads
+if __name__ == "__main__":
+    flask_thread = threading.Thread(target=run_flask_app)
+    flask_thread.start()
+    bot.run(os.environ.get("DISCORD_BOT_TOKEN"))

@@ -13,6 +13,8 @@ Peru Leni Jeevi is a versatile Discord bot designed to assist with a variety of 
 - **Uncensored Responses**: Provides uncensored responses for specific queries using the WhiteRabbit API.
 - **Periodic Summarization**: Summarizes chat history periodically to maintain context.
 - **Forum Channel Monitoring**: Monitors a specified forum channel for user queries.
+- **LLM Training**: Trains the LLM when the `/train` command is run by the server owner.
+- **Website Functionality**: Creates a website for chatting with the LLM or showcasing the Discord bot.
 
 ## Setup
 
@@ -63,6 +65,15 @@ Peru Leni Jeevi is a versatile Discord bot designed to assist with a variety of 
 
 - **Set Forum Channel**: Use the `/set_forum_channel` command to set the forum channel for the bot to monitor. This command requires administrator permissions.
 - **Start Conversation**: Use the `/start` command to initiate a conversation with the bot in a thread within the specified forum channel.
+- **Train LLM**: Use the `/train` command to train the LLM. This command requires administrator permissions.
+
+## Website Functionality
+
+The bot includes a website that serves two purposes:
+1. **Chat with the LLM**: If any trained file is generated, the website allows users to chat with the LLM.
+2. **Showcase the Discord Bot**: If no training data is generated, the website showcases the Discord bot.
+
+To access the website, navigate to `http://localhost:5000` after starting the bot.
 
 ## Contributing
 
