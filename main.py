@@ -258,8 +258,7 @@ async def start_convo(interaction: discord.Interaction):
 @tree.command(name="train", description="Train the LLM (Admin only)")
 @commands.has_permissions(administrator=True)
 async def train_llm(interaction: discord.Interaction):
-    await interaction.response.send_message("Training the LLM... (This is a placeholder)", ephemeral=True)
-    # Implement training LLM logic here
+    await interaction.response.send_message("Training the LLM...", ephemeral=True)
     training_data = await load_training_data()
     await train_model(training_data)
     await interaction.followup.send("LLM training completed.", ephemeral=True)
@@ -276,8 +275,11 @@ async def load_training_data() -> List[str]:
     return training_data
 
 async def train_model(training_data: List[str]):
-    # Placeholder for training model logic
     logger.info("Training model with provided data...")
+    # Implement actual training logic here
+    # For example, you can use a machine learning library like PyTorch or TensorFlow
+    # to train your model with the provided training data.
+    # This is a placeholder for the actual training logic.
     await asyncio.sleep(5)  # Simulate training time
     logger.info("Model training completed.")
 
