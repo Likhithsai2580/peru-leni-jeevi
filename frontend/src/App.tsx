@@ -17,23 +17,23 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Peru Leni Jeevi Chat</h1>
-      <div className="mb-4">
+    <div className="container mx-auto p-4 bg-gray-100 min-h-screen flex flex-col items-center justify-center">
+      <h1 className="text-4xl font-bold mb-6 animate-bounce">Peru Leni Jeevi Chat</h1>
+      <div className="mb-4 w-full max-w-md">
         <input
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Enter your message"
-          className="border border-gray-300 px-3 py-2 rounded w-full"
+          className="border border-gray-300 px-3 py-2 rounded w-full transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <button onClick={sendMessage} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-2">
+        <button onClick={sendMessage} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-2 transition duration-300 ease-in-out transform hover:scale-105">
           Send
         </button>
       </div>
-      <div className="border border-gray-300 p-4 rounded">
+      <div className="border border-gray-300 p-4 rounded w-full max-w-md bg-white shadow-lg">
         {chatHistory.map((item, index) => (
-          <p key={index} className="mb-2">{item}</p>
+          <p key={index} className="mb-2 animate-fade-in">{item}</p>
         ))}
       </div>
     </div>
