@@ -317,7 +317,7 @@ app = Flask(__name__)  # P2c3b
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')  # P1c7a
+    return send_from_directory('frontend/build', 'index.html')  # P1c7a
 
 @app.route('/api/bot-info', methods=['GET'])
 def bot_info():
@@ -331,6 +331,12 @@ def chat():
     # Placeholder for actual chat response logic
     bot_response = "This is a placeholder response."
     return jsonify({"response": bot_response})  # P3da2
+
+@app.route('/api/train', methods=['POST'])
+def train():
+    # Placeholder for actual training logic
+    training_message = "Training initiated."
+    return jsonify({"message": training_message})  # P3da2
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
