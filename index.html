@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peru Leni Jeevi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 600px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .chat-container {
+            display: none;
+            flex-direction: column;
+        }
+        .chat-box {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .input-container {
+            display: flex;
+        }
+        .input-container input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px 0 0 8px;
+        }
+        .input-container button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 0 8px 8px 0;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+        .input-container button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Peru Leni Jeevi</h1>
+            <p id="bot-info">Loading bot information...</p>
+        </div>
+        <div class="chat-container" id="chat-container">
+            <div class="chat-box" id="chat-box"></div>
+            <div class="input-container">
+                <input type="text" id="user-input" placeholder="Type your message here...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const botInfoElement = document.getElementById('bot-info');
+        const chatContainer = document.getElementById('chat-container');
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+
+        async function loadBotInfo() {
+            try {
+                const response = await fetch('/api/bot-info');
+                const data = await response.json();
+                if (data.modelLoaded) {
+                    botInfoElement.textContent = 'Model loaded. You can start chatting!';
+                    chatContainer.style.display = 'flex';
+                } else {
+                    botInfoElement.textContent = 'No model loaded. Please load a model to start chatting.';
+                }
+            } catch (error) {
+                botInfoElement.textContent = 'Error loading bot information.';
+            }
+        }
+
+        async function sendMessage() {
+            const message = userInput.value;
+            if (!message) return;
+
+            const userMessageElement = document.createElement('div');
+            userMessageElement.textContent = `You: ${message}`;
+            chatBox.appendChild(userMessageElement);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+                const data = await response.json();
+                const botMessageElement = document.createElement('div');
+                botMessageElement.textContent = `Bot: ${data.response}`;
+                chatBox.appendChild(botMessageElement);
+            } catch (error) {
+                const errorMessageElement = document.createElement('div');
+                errorMessageElement.textContent = 'Error sending message.';
+                chatBox.appendChild(errorMessageElement);
+            }
+
+            userInput.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        loadBotInfo();
+    </script>
+</body>
+</html>
