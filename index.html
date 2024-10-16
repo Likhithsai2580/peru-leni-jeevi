@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Peru Leni Jeevi</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
@@ -14,19 +16,28 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
-            background-color: #f0f0f0;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
         }
         .container {
             background-color: #fff;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
             width: 80%;
             max-width: 600px;
+            animation: fadeIn 1s ease-in-out;
         }
         .header {
             text-align: center;
             margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            color: #333;
+        }
+        .header p {
+            font-size: 1.2em;
+            color: #666;
         }
         .chat-container {
             display: none;
@@ -39,6 +50,7 @@
             height: 300px;
             overflow-y: auto;
             margin-bottom: 10px;
+            background-color: #f9f9f9;
         }
         .input-container {
             display: flex;
@@ -56,24 +68,48 @@
             background-color: #007bff;
             color: #fff;
             cursor: pointer;
+            transition: background-color 0.3s ease;
         }
         .input-container button:hover {
             background-color: #0056b3;
+        }
+        .training-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .training-section button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background-color: #28a745;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .training-section button:hover {
+            background-color: #218838;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Peru Leni Jeevi</h1>
+            <h1 class="animate__animated animate__bounceIn">Peru Leni Jeevi</h1>
             <p id="bot-info">Loading bot information...</p>
         </div>
         <div class="chat-container" id="chat-container">
             <div class="chat-box" id="chat-box"></div>
             <div class="input-container">
                 <input type="text" id="user-input" placeholder="Type your message here...">
-                <button onclick="sendMessage()">Send</button>
+                <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
             </div>
+        </div>
+        <div class="training-section">
+            <button onclick="trainModel()"><i class="fas fa-brain"></i> Train Model</button>
         </div>
     </div>
 
@@ -126,6 +162,18 @@
 
             userInput.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function trainModel() {
+            try {
+                const response = await fetch('/api/train', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                alert(data.message);
+            } catch (error) {
+                alert('Error training model.');
+            }
         }
 
         loadBotInfo();
