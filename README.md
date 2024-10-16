@@ -19,6 +19,7 @@ Peru Leni Jeevi is a versatile Discord bot designed to assist with a variety of 
 ### Prerequisites
 
 - Python 3.8 or higher
+- Node.js and npm (for React frontend)
 - Discord bot token
 - DeepSeek API token
 - Editee API access
@@ -50,6 +51,12 @@ Peru Leni Jeevi is a versatile Discord bot designed to assist with a variety of 
    COOKIES=your_whiterabbit_cookies
    ```
 
+5. Navigate to the `frontend` directory and install the React dependencies:
+   ```bash
+   cd frontend
+   npm install
+   ```
+
 ### Running the Bot
 
 1. Start the bot:
@@ -66,7 +73,13 @@ Peru Leni Jeevi is a versatile Discord bot designed to assist with a variety of 
    python main.py
    ```
 
-2. Open your web browser and navigate to `http://localhost:5000` to view the redesigned UI.
+2. In a new terminal, navigate to the `frontend` directory and start the React development server:
+   ```bash
+   cd frontend
+   npm start
+   ```
+
+3. Open your web browser and navigate to `http://localhost:3000` to view the redesigned UI.
 
 ## Usage
 
