@@ -29,6 +29,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Build frontend
+        run: cd frontend && npm run build
+
       - name: Create deployment directory
         run: mkdir deploy
 
@@ -38,9 +41,8 @@ jobs:
       - name: Copy main.py
         run: cp main.py deploy/
 
-      - name: Deploy to server (replace with your deployment commands)
-        run: |
-          # Replace with your actual deployment commands
-          echo "Deployment commands would go here"
-          # Example using rsync (requires server-side setup):
-          # rsync -avz deploy/ user@your_server:/path/to/deploy/
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy
