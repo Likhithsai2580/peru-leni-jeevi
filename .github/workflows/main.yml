@@ -19,7 +19,7 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm install --prefix ./frontend
+        run: npm install --prefix ./frontend ./frontend/package.json
         #working-directory: ./frontend
 
       - name: Build frontend
