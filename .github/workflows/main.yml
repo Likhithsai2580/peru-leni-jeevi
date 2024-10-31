@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          path: frontend
 
       - name: Install Node.js and npm
         uses: actions/setup-node@v3
@@ -19,12 +21,12 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm install ./frontend/package.json
-        working-directory: ./frontend
+        run: npm install
+        
 
       - name: Build frontend
         run: npm run build
-        working-directory: ./frontend
+        
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
