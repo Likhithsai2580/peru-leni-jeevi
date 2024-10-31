@@ -20,6 +20,10 @@ jobs:
           cat ./frontend/package-lock.json
         working-directory: ./frontend
 
+      - name: Print npm cache path
+        run: npm config get cache
+        working-directory: ./frontend
+
       - name: Install Node.js and npm
         uses: actions/setup-node@v3
         with:
