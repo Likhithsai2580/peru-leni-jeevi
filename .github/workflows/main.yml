@@ -20,7 +20,7 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm install --prefix ./frontend
-        working-directory: ./frontend
+        #working-directory: ./frontend
 
       - name: Build frontend
         run: npm run build
