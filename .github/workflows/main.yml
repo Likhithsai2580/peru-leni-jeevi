@@ -44,6 +44,14 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./frontend/build
 
+      - name: Error handling for build-and-deploy
+        if: failure()
+        run: echo "Build and deploy job failed."
+
+      - name: Notify on build-and-deploy failure
+        if: failure()
+        run: echo "Sending notification for build-and-deploy failure."
+
   run-bot:
     runs-on: ubuntu-latest
     needs: build-and-deploy
@@ -74,3 +82,11 @@ jobs:
             -e COOKIES=${{ secrets.COOKIES }} \
             -e DEEPSEEK=${{ secrets.DEEPSEEK }} \
             peru-leni-jeevi
+
+      - name: Error handling for run-bot
+        if: failure()
+        run: echo "Run bot job failed."
+
+      - name: Notify on run-bot failure
+        if: failure()
+        run: echo "Sending notification for run-bot failure."
