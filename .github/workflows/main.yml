@@ -11,38 +11,37 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        # Removed path parameter
+
+      - name: Set working directory
+        uses: actions/checkout@v3
+        working-directory: ./frontend
 
       - name: Verify package-lock.json exists
         run: |
-          ls -la ./frontend
-          cat ./frontend/package-lock.json
-        working-directory: ./frontend
+          ls -la ./
+          cat ./package-lock.json
 
       - name: Print npm cache path
         run: npm config get cache
-        working-directory: ./frontend
 
       - name: Install Node.js and npm
         uses: actions/setup-node@v3
         with:
           node-version: 16
           cache: 'npm'
-          cache-dependency-path: './frontend/package-lock.json'
+          cache-dependency-path: './package-lock.json'
 
       - name: Install frontend dependencies
         run: npm install
-        working-directory: ./frontend
 
       - name: Build frontend
         run: npm run build
-        working-directory: ./frontend
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./frontend/build
+          publish_dir: ./build
 
   run-bot:
     runs-on: ubuntu-latest
