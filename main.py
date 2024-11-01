@@ -338,16 +338,19 @@ async def on_message(message: discord.Message):
                 await message.channel.send(f"An error occurred: {str(e)}. Please try again.")
 
 async def main(user_query: str, history_file_name: str) -> str:
-    session_file = os.path.join(CHAT_HISTORY_FOLDER, history_file_name)
-    chat_history = await load_chat_history(session_file)
+    try:
+        session_file = os.path.join(CHAT_HISTORY_FOLDER, history_file_name)
+        chat_history = await load_chat_history(session_file)
 
-    selected_llm = await select_llm(user_query)
-    logger.info(f"{ASSISTANT_NAME} is thinking...")
+        selected_llm = await select_llm(user_query)
+        logger.info(f"{ASSISTANT_NAME} is thinking...")
 
-    user_query, response = await get_llm_response(user_query, selected_llm, chat_history)
-    chat_history.append((user_query, response))
-    await save_chat_history(chat_history, session_file)
-    return f"{ASSISTANT_NAME}: {response}"
+        user_query, response = await get_llm_response(user_query, selected_llm, chat_history)
+        chat_history.append((user_query, response))
+        await save_chat_history(chat_history, session_file)
+        return f"{ASSISTANT_NAME}: {response}"
+    except Exception as e:
+        return await handle_error(e)
 
 @bot.event
 async def on_disconnect():

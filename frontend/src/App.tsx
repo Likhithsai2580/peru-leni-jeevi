@@ -4,14 +4,23 @@ import axios from 'axios';
 const App: React.FC = () => {
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<string>>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const sendMessage = async () => {
     try {
       const response = await axios.post('/chat', { message });
       setChatHistory([...chatHistory, `User: ${message}`, `Bot: ${response.data.response}`]);
       setMessage('');
+      setError(null);
     } catch (error) {
       console.error('Error sending message:', error);
+      if (error.response) {
+        setError('Network error: Unable to reach the server.');
+      } else if (error.request) {
+        setError('Network error: No response received from the server.');
+      } else {
+        setError('An unexpected error occurred.');
+      }
       setChatHistory([...chatHistory, 'Error sending message.']);
     }
   };
@@ -31,6 +40,7 @@ const App: React.FC = () => {
           Send
         </button>
       </div>
+      {error && <div className="text-red-500 mb-4">{error}</div>}
       <div className="border border-gray-300 p-4 rounded w-full max-w-md bg-white shadow-lg">
         {chatHistory.map((item, index) => (
           <p key={index} className="mb-2 animate-fade-in">{item}</p>
