@@ -230,16 +230,28 @@ def load_llm():
         return None
 
 async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) -> Tuple[str, str]:
-    generator = load_llm()
-    if generator is None:
-        return query, "Error loading LLM"
-
     try:
-        response = generator(query, max_length=128, num_return_sequences=1)[0]['generated_text']
+        if llm == "deepseek chat":
+            response = await deepseek_api.generate(query)
+        elif llm == "coder":
+            response = await editee_generate(query, model="gpt4", system_prompt="You are a coding assistant.")
+        elif llm == "gemini":
+            response = await real_time(query)
+        elif llm == "uncensored":
+            response = await uncensored_response(query)
+        else:
+            response = await editee_generate(query, model="gpt4")
+            
         return query, response
     except Exception as e:
         logger.error(f"Error generating response: {e}")
-        return query, f"An error occurred: {str(e)}"
+        # Fallback to GPT-4 if other models fail
+        try:
+            fallback_response = await editee_generate(query, model="gpt4")
+            return query, fallback_response
+        except Exception as e2:
+            logger.error(f"Fallback also failed: {e2}")
+            return query, "I apologize, but I'm having trouble processing your request right now. Please try again later."
 
 # Initialize Discord bot
 intents = discord.Intents.default()
@@ -375,10 +387,35 @@ def chat():
         return jsonify({'response': response})
     return jsonify({'error': 'No message provided'})
 
-# Run the bot and Flask app in separate threads
+@app.route('/health')
+def health_check():
+    return jsonify({'status': 'healthy'})
+
+def run_flask():
+    app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+
+async def main():
+    try:
+        # Initialize bot and APIs
+        load_llm()
+        
+        # Start Flask in a separate thread
+        flask_thread = threading.Thread(target=run_flask)
+        flask_thread.daemon = True
+        flask_thread.start()
+        
+        # Run the bot with a timeout
+        await asyncio.wait_for(
+            bot.start(os.environ.get("DISCORD_BOT_TOKEN")),
+            timeout=21300  # 5 hours 55 minutes (just under GitHub's 6-hour limit)
+        )
+    except asyncio.TimeoutError:
+        logger.info("Bot session timed out - this is normal for GitHub Actions")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+    finally:
+        await bot.close()
+        logger.info("Bot shutdown complete")
+
 if __name__ == "__main__":
-    # Load the LLM before starting the bot
-    load_llm()
-    flask_thread = threading.Thread(target=lambda: app.run(debug=True, port=5000))
-    flask_thread.start()
-    bot.run(os.environ.get("DISCORD_BOT_TOKEN"))
+    asyncio.run(main())
