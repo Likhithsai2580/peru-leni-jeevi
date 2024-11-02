@@ -9,6 +9,6 @@ transformers>=4.15.0
 datasets>=2.0.0
 nltk>=3.6.0
 nlpaug>=1.1.0
-googletrans-py>=3.0.0
+googletrans==3.1.0a0
 torch>=1.9.0
 tf_keras

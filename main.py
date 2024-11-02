@@ -163,14 +163,16 @@ def augment_data(text):
     return augmented_text
 
 def back_translate(text):
-    translator = Translator()
     try:
-        translated = translator.translate(text, dest='fr')
-        back_translated = translator.translate(translated.text, dest='en')
-        return back_translated.text
+        from googletrans import Translator
+        translator = Translator()
+        # Translate to French and back to English
+        fr_text = translator.translate(text, dest='fr').text
+        back_translated = translator.translate(fr_text, dest='en').text
+        return back_translated
     except Exception as e:
         logger.error(f"Error during back-translation: {e}")
-        return text
+        return text  # Return original text if translation fails
 
 async def train_model(training_data: List[str]):
     logger.info("Training model with provided data...")
