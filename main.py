@@ -351,7 +351,7 @@ async def on_message(message: discord.Message):
 
             try:
                 async with message.channel.typing():
-                    bot_response = await main(user_input, history_file_name)
+                    bot_response = await process_query(user_input, history_file_name)
 
                 if len(bot_response) > 1900:
                     file_name = f"response_{message.id}.txt"
@@ -365,7 +365,7 @@ async def on_message(message: discord.Message):
                 logger.error(f"Error processing message: {str(e)}", exc_info=True)
                 await message.channel.send(f"An error occurred: {str(e)}. Please try again.")
 
-async def main(user_query: str, history_file_name: str) -> str:
+async def process_query(user_query: str, history_file_name: str) -> str:
     try:
         session_file = os.path.join(CHAT_HISTORY_FOLDER, history_file_name)
         chat_history = await load_chat_history(session_file)
@@ -399,7 +399,7 @@ def index():
 def chat():
     user_input = request.json.get('message')
     if user_input:
-        response = asyncio.run(main(user_input, "web_chat.txt"))
+        response = asyncio.run(process_query(user_input, "web_chat.txt"))
         return jsonify({'response': response})
     return jsonify({'error': 'No message provided'})
 
