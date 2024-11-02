@@ -318,6 +318,20 @@ async def load_training_data() -> List[str]:
                 training_data.append(data)
     return training_data
 
+async def zip_files_and_share(interaction: discord.Interaction):
+    try:
+        with zipfile.ZipFile(ZIP_FILE_NAME, 'w') as zipf:
+            zipf.write('./trained_model', 'trained_model')
+            zipf.write('./results', 'results')
+            zipf.write('./logs', 'logs')
+        
+        await interaction.followup.send(
+            "Here's the trained model and associated files:",
+            file=discord.File(ZIP_FILE_NAME)
+        )
+    finally:
+        if os.path.exists(ZIP_FILE_NAME):
+            os.remove(ZIP_FILE_NAME)
 
 @bot.event
 async def on_message(message: discord.Message):
