@@ -298,17 +298,27 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-def save_forum_channel_id(channel_id):
-    data = {"forum_channel_id": channel_id}
-    with open(FORUM_CHANNEL_ID_FILE, "w") as f:
-        json.dump(data, f)
+async def save_forum_channel_id(guild_id: int, channel_id: int):
+    config_file = os.path.join(CHAT_HISTORY_FOLDER, "forum_channels.json")
+    
+    if os.path.exists(config_file):
+        async with aiofiles.open(config_file, 'r') as f:
+            data = json.loads(await f.read())
+    else:
+        data = {}
+    
+    data[str(guild_id)] = channel_id
+    
+    async with aiofiles.open(config_file, 'w') as f:
+        await f.write(json.dumps(data, indent=2))
 
-def load_forum_channel_id() -> Optional[int]:
-    if not os.path.exists(FORUM_CHANNEL_ID_FILE):
-        return None
-    with open(FORUM_CHANNEL_ID_FILE, "r") as f:
-        data = json.load(f)
-    return data.get("forum_channel_id")
+def load_forum_channel_id(guild_id: int) -> Optional[int]:
+    config_file = os.path.join(CHAT_HISTORY_FOLDER, "forum_channels.json")
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            data = json.load(f)
+            return data.get(str(guild_id))
+    return None
 
 @bot.event
 async def on_ready():
@@ -330,11 +340,17 @@ async def set_forum_channel(interaction: discord.Interaction, channel: discord.F
 
 @tree.command(name="start", description="Initiate conversation with Peru Leni Jeevi in a thread.")
 async def start_convo(interaction: discord.Interaction):
-    forum_channel_id = load_forum_channel_id()
+    forum_channel_id = load_forum_channel_id(interaction.guild_id)
     if forum_channel_id is None:
-        await interaction.response.send_message("Forum channel is not configured yet.", ephemeral=True)
+        await interaction.response.send_message(
+            "Forum channel is not configured for this server. Ask an admin to use /set_forum_channel",
+            ephemeral=True
+        )
     else:
-        await interaction.response.send_message(f"Hello! I am {ASSISTANT_NAME}. Please create a thread to start.", ephemeral=True)
+        await interaction.response.send_message(
+            f"Hello! I am {ASSISTANT_NAME}. Please create a thread to start.",
+            ephemeral=True
+        )
 
 @tree.command(name="train", description="Train the LLM (Admin only)")
 @commands.has_permissions(administrator=True)
@@ -387,7 +403,7 @@ async def on_message(message: discord.Message):
 
             try:
                 async with message.channel.typing():
-                    bot_response = await process_query(user_input, history_file_name)
+                    bot_response = await process_query(user_input, history_file_name, message.guild.id)
 
                 if len(bot_response) > 1900:
                     file_name = f"response_{message.id}.txt"
@@ -401,16 +417,14 @@ async def on_message(message: discord.Message):
                 logger.error(f"Error processing message: {str(e)}", exc_info=True)
                 await message.channel.send(f"An error occurred: {str(e)}. Please try again.")
 
-async def process_query(user_query: str, history_file_name: str) -> str:
+async def process_query(user_query: str, history_file_name: str, guild_id: int) -> str:
     try:
-        # Remove .txt extension if present and ensure correct extension
-        base_name = history_file_name.replace('.txt', '')
+        # Include guild_id in the file name
+        base_name = f"guild_{guild_id}_{history_file_name.replace('.txt', '')}"
         session_file = f"{base_name}.json"
         
         chat_history = await load_chat_history(session_file)
-        
-        # Extract thread_id from history_file_name (format: "thread_123456")
-        thread_id = base_name.split('_')[1]
+        thread_id = base_name.split('_')[3]  # Adjusted index for new naming format
         
         selected_llm = await select_llm(user_query)
         logger.info(f"{ASSISTANT_NAME} is thinking...")
@@ -441,7 +455,7 @@ def index():
 def chat():
     user_input = request.json.get('message')
     if user_input:
-        response = asyncio.run(process_query(user_input, "web_chat.txt"))
+        response = asyncio.run(process_query(user_input, "web_chat.txt", 0))
         return jsonify({'response': response})
     return jsonify({'error': 'No message provided'})
 
