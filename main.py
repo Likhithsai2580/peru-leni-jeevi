@@ -279,7 +279,7 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
         elif llm == "gemini":
             response = await blackbox_api(full_prompt, "blackboxai", thread_id, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
         elif llm == "uncensored":
-            response = await pentestgpt_api(full_prompt, PENTESTGPT_API_KEY)
+            response = await pentestgpt_api(full_prompt, thread_id, PENTESTGPT_API_KEY)
         else:
             response = await openai_chat(full_prompt, session_id=BLACKBOX_SESSION_ID, csrf_token=BLACKBOX_CSRF_TOKEN)
         
