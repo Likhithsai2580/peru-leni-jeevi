@@ -148,20 +148,20 @@ async def handle_error(e: Exception) -> str:
     return f"An error occurred: {str(e)}. Please try again."
 
 async def select_llm(query: str) -> str:
-    classification_prompt = f"""As {ASSISTANT_NAME}, assess the user query and determine the most appropriate category from the following options:
+    classification_prompt = f"""Classify this query into exactly one category:
+    1. Mathematical: Math, calculations, equations, numerical problems
+    2. Programming: Code, debugging, algorithms, development
+    3. Realtime: Current events, time, weather, live data
+    4. Censored: Illegal activities, hacks, exploits
+    5. General: Everything else
 
-    Mathematical: Questions involving math, calculations, or equations.
-    Programming: Questions related to coding, algorithms, or debugging.
-    General: Queries about general knowledge or conversational topics.
-    Realtime: Questions needing current information or when the LLM may not have knowledge on the topic.
-    Censored: If question is illegal return this classification including game hacks etc
-    User Query: "{query}"
-
-    Respond with only the category name, e.g., "Mathematical" or "Programming"."""
+    Query: "{query}"
+    Category:"""
 
     response = await openai_chat(classification_prompt)
     response = response.strip().lower()
     logger.info(f"Classification response: {response}")
+    
     if "mathematical" in response:
         return "deepseek chat"
     elif "programming" in response:
@@ -258,37 +258,39 @@ def load_llm():
 
 async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]], thread_id: str = None) -> Tuple[str, str]:
     try:
+        system_prompt = f"""You are {ASSISTANT_NAME}, a helpful AI assistant created by {DEVELOPER_NAME}. 
+        You provide accurate, concise responses while maintaining a friendly tone.
+        For real-time queries, acknowledge the time-sensitive nature and suggest reliable sources.
+        For programming questions, include code examples when relevant.
+        For mathematical problems, show your work step-by-step.
+        Never claim to be created by OpenAI or any other company."""
+
+        full_prompt = f"{system_prompt}\n\nUser: {query}"
+        
         if llm == "deepseek chat":
-            response = await deepseek_api(query, thread_id, DEEPSEEK_API_KEY)
+            response = await deepseek_api(full_prompt, thread_id, DEEPSEEK_API_KEY)
         elif llm == "coder":
-            # First Deepseek response
-            deepseek_response = await deepseek_api(query, None, DEEPSEEK_API_KEY)
-            
-            # 5 back-and-forth conversations
+            deepseek_response = await deepseek_api(full_prompt, None, DEEPSEEK_API_KEY)
             for _ in range(5):
-                # Claude responds to Deepseek
                 claude_response = await blackbox_api(deepseek_response, "claude-sonnet-3.5", None, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
-                # Deepseek responds to Claude
                 deepseek_response = await deepseek_api(claude_response, None, DEEPSEEK_API_KEY)
-            
-            # Return final Deepseek response
             response = await deepseek_api(deepseek_response, thread_id, DEEPSEEK_API_KEY)
         elif llm == "gemini":
-            response = await blackbox_api(query, "blackboxai", thread_id, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
+            response = await blackbox_api(full_prompt, "blackboxai", thread_id, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
         elif llm == "uncensored":
-            response = await pentestgpt_api(query, PENTESTGPT_API_KEY)
+            response = await pentestgpt_api(full_prompt, PENTESTGPT_API_KEY)
         else:
-            response = await openai_chat(query)
+            response = await openai_chat(full_prompt)
+        
         return query, response
     except Exception as e:
         logger.error(f"Error generating response: {e}")
-        # Fallback to GPT-4 if other models fail
         try:
-            fallback_response = await openai_chat(query)
+            fallback_response = await openai_chat(f"{system_prompt}\n\nUser: {query}")
             return query, fallback_response
         except Exception as e2:
             logger.error(f"Fallback also failed: {e2}")
-            return query, "I apologize, but I'm having trouble processing your request right now. Please try again later."
+            return query, f"I apologize, but I'm experiencing technical difficulties. Please try again later. Error: {str(e)}"
 
 # Initialize Discord bot
 intents = discord.Intents.default()
