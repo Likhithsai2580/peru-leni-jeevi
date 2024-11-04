@@ -309,7 +309,6 @@ def load_forum_channel_id() -> Optional[int]:
 
 @bot.event
 async def on_ready():
-    await deepseek_api.initialize()
     await tree.sync()
     logger.info(f"Logged in as {bot.user.name} and synced slash commands.")
     keep_alive.start()
@@ -401,11 +400,14 @@ async def on_message(message: discord.Message):
 
 async def process_query(user_query: str, history_file_name: str) -> str:
     try:
-        session_file = os.path.join(CHAT_HISTORY_FOLDER, history_file_name)
+        # Remove .txt extension if present and ensure correct extension
+        base_name = history_file_name.replace('.txt', '')
+        session_file = f"{base_name}.json"
+        
         chat_history = await load_chat_history(session_file)
         
-        # Extract thread_id from history_file_name (format: "thread_123456.txt")
-        thread_id = history_file_name.split('_')[1].split('.')[0]
+        # Extract thread_id from history_file_name (format: "thread_123456")
+        thread_id = base_name.split('_')[1]
         
         selected_llm = await select_llm(user_query)
         logger.info(f"{ASSISTANT_NAME} is thinking...")
