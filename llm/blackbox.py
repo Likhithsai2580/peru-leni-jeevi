@@ -124,7 +124,16 @@ class BlackboxAI:
                             # Skip the search results section
                             if decoded.startswith('$~~~$'):
                                 continue
-                            full_response += decoded
+                            try:
+                                # Try to parse as JSON first
+                                json_response = json.loads(decoded)
+                                if isinstance(json_response, dict):
+                                    full_response += json_response.get('content', '')
+                                else:
+                                    full_response += str(json_response)
+                            except json.JSONDecodeError:
+                                # If not JSON, treat as plain text
+                                full_response += decoded
                     
                     self._save_chat_history(chat_history_id, message, full_response)
                     return full_response.strip()
