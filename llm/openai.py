@@ -263,7 +263,7 @@ class OpenAI:
                 return True
         return False
 
-async def openai_api(messages: List[Dict[str, str]], stream: bool = False):
+async def openai_api(messages: List[Dict[str, str]], stream: bool = False, chat_history_id: str = None, session_id: str = None, csrf_token: str = None):
     """
     High-level function to interact with the OpenAI API.
     
@@ -275,7 +275,7 @@ async def openai_api(messages: List[Dict[str, str]], stream: bool = False):
         Union[Dict, str]: API response or streamed content
     """
     async with OpenAI() as client:
-        response = await client.chat_completion(messages, stream=stream)
+        response = await client.chat_completion(messages, stream=stream, chat_history_id=chat_history_id, session_id=session_id, csrf_token=csrf_token)
         if stream:
             full_response = ""
             async for chunk in response:
@@ -290,7 +290,7 @@ async def openai_chat(prompt: str, session_id: str = None, csrf_token: str = Non
         messages = [{"role": "user", "content": prompt}]
         
         # Make API call with correct message format
-        response = await openai_api(messages)
+        response = await openai_api(messages,chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
         
         # Handle the response
         if isinstance(response, dict):
