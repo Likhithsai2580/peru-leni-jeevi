@@ -335,20 +335,44 @@ async def keep_alive():
 @tree.command(name="set_forum_channel", description="Set the forum channel for Peru Leni Jeevi to monitor (Admin only)")
 @commands.has_permissions(administrator=True)
 async def set_forum_channel(interaction: discord.Interaction, channel: discord.ForumChannel):
-    save_forum_channel_id(channel.id)
-    await interaction.response.send_message(f"Forum channel set to: {channel.name}", ephemeral=True)
+    try:
+        await save_forum_channel_id(interaction.guild_id, channel.id)
+        await interaction.response.send_message(
+            f"Forum channel set to: {channel.name}",
+            ephemeral=True
+        )
+    except Exception as e:
+        logger.error(f"Error setting forum channel: {e}")
+        await interaction.response.send_message(
+            "Failed to set forum channel. Please try again.",
+            ephemeral=True
+        )
 
 @tree.command(name="start", description="Initiate conversation with Peru Leni Jeevi in a thread.")
 async def start_convo(interaction: discord.Interaction):
-    forum_channel_id = load_forum_channel_id(interaction.guild_id)
-    if forum_channel_id is None:
+    try:
+        forum_channel_id = load_forum_channel_id(interaction.guild_id)
+        if forum_channel_id is None:
+            await interaction.response.send_message(
+                "Forum channel is not configured for this server. Ask an admin to use /set_forum_channel",
+                ephemeral=True
+            )
+        else:
+            forum_channel = interaction.guild.get_channel(forum_channel_id)
+            if forum_channel is None:
+                await interaction.response.send_message(
+                    "Configured forum channel no longer exists. Ask an admin to use /set_forum_channel",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    f"Hello! I am {ASSISTANT_NAME}. Please create a thread in {forum_channel.mention} to start.",
+                    ephemeral=True
+                )
+    except Exception as e:
+        logger.error(f"Error in start command: {e}")
         await interaction.response.send_message(
-            "Forum channel is not configured for this server. Ask an admin to use /set_forum_channel",
-            ephemeral=True
-        )
-    else:
-        await interaction.response.send_message(
-            f"Hello! I am {ASSISTANT_NAME}. Please create a thread to start.",
+            "An error occurred. Please try again later.",
             ephemeral=True
         )
 
@@ -389,19 +413,21 @@ async def zip_files_and_share(interaction: discord.Interaction):
 
 @bot.event
 async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+
     await bot.process_commands(message)
 
     if isinstance(message.channel, discord.Thread):
-        forum_channel_id = load_forum_channel_id()
-        if forum_channel_id is None:
-            logger.warning("No forum channel configured.")
-            return
+        try:
+            forum_channel_id = load_forum_channel_id(message.guild.id)
+            if forum_channel_id is None:
+                return
 
-        if message.channel.parent_id == int(forum_channel_id) and message.author != bot.user:
-            history_file_name = f"thread_{message.channel.id}.txt"
-            user_input = message.content
+            if message.channel.parent_id == forum_channel_id:
+                history_file_name = f"guild_{message.guild.id}_thread_{message.channel.id}"
+                user_input = message.content
 
-            try:
                 async with message.channel.typing():
                     bot_response = await process_query(user_input, history_file_name, message.guild.id)
 
@@ -409,13 +435,16 @@ async def on_message(message: discord.Message):
                     file_name = f"response_{message.id}.txt"
                     async with aiofiles.open(file_name, "w", encoding="utf-8") as file:
                         await file.write(bot_response)
-                    await message.channel.send(f"{ASSISTANT_NAME}: The response is too long. Find it in the attached file.", file=discord.File(file_name))
+                    await message.channel.send(
+                        f"{ASSISTANT_NAME}: The response is too long. Find it in the attached file.",
+                        file=discord.File(file_name)
+                    )
                     os.remove(file_name)
                 else:
                     await message.channel.send(bot_response)
-            except Exception as e:
-                logger.error(f"Error processing message: {str(e)}", exc_info=True)
-                await message.channel.send(f"An error occurred: {str(e)}. Please try again.")
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+            await message.channel.send(f"An error occurred: {str(e)}. Please try again.")
 
 async def process_query(user_query: str, history_file_name: str, guild_id: int) -> str:
     try:
