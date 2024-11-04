@@ -79,7 +79,7 @@ class BlackboxAI:
             json.dump(history, f, indent=2)
 
     async def chat(self, message: str, chat_history_id: Optional[str] = None, model="claude-sonnet-3.5"):
-        # MODELS: blackboxai, claude-sonnet-3.5
+        # MODELS: blackboxai, claude-sonnet-3.5, gpt-4o
         if not chat_history_id:
             chat_history_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             

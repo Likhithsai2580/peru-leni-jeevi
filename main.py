@@ -74,7 +74,7 @@ async def summarize_chat_history(filepath: str) -> str:
 
 Summary:"""
 
-    summary = await openai_chat(summarization_prompt)
+    summary = await openai_chat(summarization_prompt, session_id=BLACKBOX_SESSION_ID, csrf_token=BLACKBOX_CSRF_TOKEN)
     summary = summary.strip()
     
     # Save summary in JSON format
@@ -156,7 +156,7 @@ async def select_llm(query: str) -> str:
     Query: "{query}"
     Category:"""
 
-    response = await openai_chat(classification_prompt)
+    response = await openai_chat(classification_prompt, session_id=BLACKBOX_SESSION_ID, csrf_token=BLACKBOX_CSRF_TOKEN)
     response = response.strip().lower()
     logger.info(f"Classification response: {response}")
     
@@ -279,7 +279,7 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
         elif llm == "uncensored":
             response = await pentestgpt_api(full_prompt, PENTESTGPT_API_KEY)
         else:
-            response = await openai_chat(full_prompt)
+            response = await openai_chat(full_prompt, session_id=BLACKBOX_SESSION_ID, csrf_token=BLACKBOX_CSRF_TOKEN)
         
         # Handle different response types
         if isinstance(response, dict):

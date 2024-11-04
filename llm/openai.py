@@ -73,7 +73,7 @@ class OpenAI:
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4o",
         temperature: float = 0.5,
         presence_penalty: float = 0,
         frequency_penalty: float = 0,
@@ -285,22 +285,30 @@ async def openai_api(messages: List[Dict[str, str]], stream: bool = False):
             return full_response
         return response
 
-async def openai_chat(prompt: str) -> str:
-    """
-    Function to get response from OpenAI API for a single prompt.
-    
-    Args:
-        prompt: Input string prompt
+async def openai_chat(prompt: str, session_id: str = None, csrf_token: str = None) -> str:
+    try:
+        # Convert prompt string to proper messages format
+        messages = [{"role": "user", "content": prompt}]
         
-    Returns:
-        str: Response from the assistant
-    """
-    messages = [{"role": "user", "content": prompt}]
-    response = await openai_api(messages)
-    
-    if isinstance(response, dict) and "choices" in response:
-        return response['choices'][0]['message']['content']
-    return response
+        # Make API call with correct message format
+        response = await openai_api(messages)
+        
+        # Handle the response
+        if isinstance(response, dict):
+            if 'choices' in response and len(response['choices']) > 0:
+                return response['choices'][0]['message']['content']
+            elif 'error' in response:
+                from llm.blackbox import blackbox_api
+                response = await blackbox_api(prompt, model="gpt-4o", chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
+                return response
+            else:
+                return str(response)
+        
+        return str(response)
+
+    except Exception as e:
+        logger.error(f"Error in openai_chat: {e}")
+        return f"An error occurred while processing your request: {str(e)}"
 
 if __name__ == "__main__":
     async def main():
