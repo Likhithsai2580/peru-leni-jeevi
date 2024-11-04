@@ -4,10 +4,8 @@ import asyncio
 from typing import Optional, List, Tuple
 from dotenv import load_dotenv
 import discord
+from dotenv import load_dotenv
 from discord.ext import commands
-from llm.whiterabbit import uncensored_response
-from llm.Editee import generate as editee_generate, real_time
-from llm.deepseek import DeepSeekAPI
 import aiofiles
 import logging
 from discord.ext import tasks
@@ -24,6 +22,13 @@ from nltk.corpus import wordnet
 import nlpaug.augmenter.word as naw
 from googletrans import Translator
 import torch
+from datetime import datetime
+
+from llm.deepseek import deepseek_api
+from llm.openai import openai_chat
+from llm.blackbox import blackbox_api
+from llm.pentestgpt import pentestgpt_api
+load_dotenv()
 
 nltk.download('wordnet')
 
@@ -48,8 +53,12 @@ os.makedirs(CHAT_HISTORY_FOLDER, exist_ok=True)
 os.makedirs(CHAT_SUMMARY_FOLDER, exist_ok=True)
 os.makedirs(FRONTEND_DIR, exist_ok=True)
 
-# Create a singleton instance of DeepSeekAPI
-deepseek_api = DeepSeekAPI()
+
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK")
+CSRF_TOKEN = os.getenv("CSRF_TOKEN")
+PENTESTGPT_API_KEY = os.getenv("PENTESTGPT")
+BLACKBOX_SESSION_ID = os.getenv("SESSION_ID")
+BLACKBOX_CSRF_TOKEN = os.getenv("CSRF_TOKEN")
 
 # Summarization task
 async def summarize_chat_history(filepath: str) -> str:
@@ -66,42 +75,57 @@ async def summarize_chat_history(filepath: str) -> str:
 
 Summary:"""
 
-    summary = await editee_generate(summarization_prompt, model="gpt4", stream=False)
+    summary = await openai_chat(summarization_prompt)
     summary = summary.strip()
+    
+    # Save summary in JSON format
+    summary_file = os.path.join(CHAT_SUMMARY_FOLDER, f"summary_{filepath}.json")
+    summary_data = {
+        'timestamp': datetime.now().isoformat(),
+        'summary': summary
+    }
+    async with aiofiles.open(summary_file, 'w') as f:
+        await f.write(json.dumps(summary_data, indent=2))
+        
     logger.info(f"Summarization result for {filepath}: {summary}")
     return summary
 
 async def load_chat_history(filepath: str) -> List[Tuple[str, str]]:
-    if not os.path.exists(filepath):
-        return []
-
-    async with aiofiles.open(filepath, "r") as f:
-        lines = await f.readlines()
-
-    history = []
-    for i in range(0, len(lines), 2):
-        if i + 1 < len(lines):
-            user_line = lines[i].strip()
-            ai_line = lines[i + 1].strip()
-            if user_line.startswith("User: ") and ai_line.startswith(f"{ASSISTANT_NAME}: "):
-                user = user_line.replace("User: ", "")
-                ai = ai_line.replace(f"{ASSISTANT_NAME}: ", "")
-                history.append((user, ai))
-            else:
-                logger.warning(f"Unexpected line format at lines {i+1} and {i+2}")
-        else:
-            logger.warning(f"Incomplete entry found in chat history at line {i+1}")
-    return history
-
+    history_file = os.path.join(CHAT_HISTORY_FOLDER, f"{filepath}.json")
+    if os.path.exists(history_file):
+        async with aiofiles.open(history_file, 'r') as f:
+            data = json.loads(await f.read())
+            messages = data.get('messages', [])
+            history = []
+            for message in messages:
+                if 'prompt' in message and 'response' in message:
+                    history.append((message['prompt'], message['response']))
+            return history
+    return []
 
 async def save_chat_history(history: List[Tuple[str, str]], filepath: str):
-    async with aiofiles.open(filepath, "w") as f:
-        for user, ai in history:
-            if user and ai:
-                await f.write(f"User: {user}\n")
-                await f.write(f"{ASSISTANT_NAME}: {ai}\n")
-            else:
-                logger.warning(f"Skipping incomplete entry: User: {user}, AI: {ai}")
+    history_file = os.path.join(CHAT_HISTORY_FOLDER, f"{filepath}.json")
+    
+    if os.path.exists(history_file):
+        async with aiofiles.open(history_file, 'r') as f:
+            data = json.loads(await f.read())
+    else:
+        data = {
+            'created_at': datetime.now().isoformat(),
+            'model': 'peru_leni_jeevi',
+            'messages': []
+        }
+
+    for user, ai in history:
+        if user and ai:
+            data['messages'].append({
+                'timestamp': datetime.now().isoformat(),
+                'prompt': user,
+                'response': ai
+            })
+
+    async with aiofiles.open(history_file, 'w') as f:
+        await f.write(json.dumps(data, indent=2))
 
 async def append_summary_to_history(filepath: str, summary: str):
     summary_file = os.path.join(CHAT_SUMMARY_FOLDER, f"summary_{filepath}")
@@ -134,7 +158,7 @@ async def select_llm(query: str) -> str:
 
     Respond with only the category name, e.g., "Mathematical" or "Programming"."""
 
-    response = await editee_generate(classification_prompt, model="gpt4", stream=False)
+    response = await openai_chat(classification_prompt)
     response = response.strip().lower()
     logger.info(f"Classification response: {response}")
     if "mathematical" in response:
@@ -231,25 +255,35 @@ def load_llm():
         logger.error(f"Error loading model: {e}")
         return None
 
-async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]]) -> Tuple[str, str]:
+async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, str]], thread_id: str = None) -> Tuple[str, str]:
     try:
         if llm == "deepseek chat":
-            response = await deepseek_api.generate(query)
+            response = await deepseek_api(query, thread_id, DEEPSEEK_API_KEY)
         elif llm == "coder":
-            response = await editee_generate(query, model="gpt4", system_prompt="You are a coding assistant.")
-        elif llm == "gemini":
-            response = await real_time(query)
-        elif llm == "uncensored":
-            response = await uncensored_response(query)
-        else:
-            response = await editee_generate(query, model="gpt4")
+            # First Deepseek response
+            deepseek_response = await deepseek_api(query, None, DEEPSEEK_API_KEY)
             
+            # 5 back-and-forth conversations
+            for _ in range(5):
+                # Claude responds to Deepseek
+                claude_response = await blackbox_api(deepseek_response, "claude-sonnet-3.5", None, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
+                # Deepseek responds to Claude
+                deepseek_response = await deepseek_api(claude_response, None, DEEPSEEK_API_KEY)
+            
+            # Return final Deepseek response
+            response = await deepseek_api(deepseek_response, thread_id, DEEPSEEK_API_KEY)
+        elif llm == "gemini":
+            response = await blackbox_api(query, "blackboxai", thread_id, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
+        elif llm == "uncensored":
+            response = await pentestgpt_api(query, PENTESTGPT_API_KEY)
+        else:
+            response = await openai_chat(query)
         return query, response
     except Exception as e:
         logger.error(f"Error generating response: {e}")
         # Fallback to GPT-4 if other models fail
         try:
-            fallback_response = await editee_generate(query, model="gpt4")
+            fallback_response = await openai_chat(query)
             return query, fallback_response
         except Exception as e2:
             logger.error(f"Fallback also failed: {e2}")
@@ -369,11 +403,14 @@ async def process_query(user_query: str, history_file_name: str) -> str:
     try:
         session_file = os.path.join(CHAT_HISTORY_FOLDER, history_file_name)
         chat_history = await load_chat_history(session_file)
-
+        
+        # Extract thread_id from history_file_name (format: "thread_123456.txt")
+        thread_id = history_file_name.split('_')[1].split('.')[0]
+        
         selected_llm = await select_llm(user_query)
         logger.info(f"{ASSISTANT_NAME} is thinking...")
 
-        user_query, response = await get_llm_response(user_query, selected_llm, chat_history)
+        user_query, response = await get_llm_response(user_query, selected_llm, chat_history, thread_id)
         chat_history.append((user_query, response))
         await save_chat_history(chat_history, session_file)
         return f"{ASSISTANT_NAME}: {response}"
