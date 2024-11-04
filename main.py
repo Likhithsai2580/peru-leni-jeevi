@@ -23,6 +23,7 @@ import nlpaug.augmenter.word as naw
 from googletrans import Translator
 import torch
 from datetime import datetime
+import traceback
 
 # LLM APIs
 from llm.deepseek import deepseek_api
@@ -142,6 +143,7 @@ async def periodic_summarization():
                 await append_summary_to_history(filepath, summary)
 
 async def handle_error(e: Exception) -> str:
+    traceback.print_exc()
     logger.error(f"Error occurred: {str(e)}", exc_info=True)
     return f"An error occurred: {str(e)}. Please try again."
 
@@ -270,10 +272,10 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
             response = await deepseek_api(full_prompt, thread_id, DEEPSEEK_API_KEY)
         elif llm == "coder":
             deepseek_response = await deepseek_api(full_prompt, None, DEEPSEEK_API_KEY)
-            for _ in range(5):
-                claude_response = await blackbox_api(deepseek_response, "claude-sonnet-3.5", None, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
-                deepseek_response = await deepseek_api(claude_response, None, DEEPSEEK_API_KEY)
-            response = await deepseek_api(deepseek_response, thread_id, DEEPSEEK_API_KEY)
+            for _ in range(3):
+                claude_response = await blackbox_api(f"give me suggestions and few code examples to improve this code: {deepseek_response}", "claude-sonnet-3.5", None, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
+                deepseek_response = await deepseek_api(f"give me complete code incoprating {claude_response} in {deepseek_response}", None, DEEPSEEK_API_KEY)
+            response = await deepseek_api(f"give me complete code for {deepseek_response}", thread_id, DEEPSEEK_API_KEY)
         elif llm == "gemini":
             response = await blackbox_api(full_prompt, "blackboxai", thread_id, BLACKBOX_SESSION_ID, BLACKBOX_CSRF_TOKEN)
         elif llm == "uncensored":

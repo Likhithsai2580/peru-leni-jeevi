@@ -7,7 +7,7 @@ import aiohttp
 import asyncio
 import logging
 from dotenv import load_dotenv
-
+import traceback
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -137,6 +137,7 @@ class Deepseek:
                                     content = delta['content']
                                     full_response += content
                         except json.JSONDecodeError:
+                            traceback.print_exc()
                             pass
 
         # Save chat history

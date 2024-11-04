@@ -5,6 +5,7 @@ import time
 import os
 from datetime import datetime
 from typing import Optional
+import traceback
 
 class BlackboxAI:
     def __init__(self, session_id=None, csrf_token=None):
@@ -143,9 +144,11 @@ class BlackboxAI:
                     return None
                     
         except aiohttp.ClientTimeout:
+            traceback.print_exc()
             print("Request timed out")
             return None
         except aiohttp.ClientError as e:
+            traceback.print_exc()
             print(f"Error making request: {e}")
             return None
 

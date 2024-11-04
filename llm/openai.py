@@ -19,7 +19,7 @@ class OpenAI:
 
     def __init__(self):
         """Initialize the OpenAI client with optimized connection settings."""
-        self.base_url = "https://great-blondell-devsdocodeorg-cc6b3578.koyeb.app"
+        self.base_url = "https://openai-devsdocode.vercel.app"
         self.session: Optional[aiohttp.ClientSession] = None
         self.timeout = aiohttp.ClientTimeout(
             total=60,
@@ -290,24 +290,27 @@ async def openai_chat(prompt: str, session_id: str = None, csrf_token: str = Non
         messages = [{"role": "user", "content": prompt}]
         
         # Make API call with correct message format
-        response = await openai_api(messages,chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
+        response = await openai_api(messages, chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
         
         # Handle the response
         if isinstance(response, dict):
             if 'choices' in response and len(response['choices']) > 0:
-                return response['choices'][0]['message']['content']
-            elif 'error' in response:
-                from llm.blackbox import blackbox_api
-                response = await blackbox_api(prompt, model="gpt-4o", chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
-                return response
-            else:
-                return str(response)
+                content = response['choices'][0]['message']['content']
+                if content:  # Check if content is not None or empty
+                    return content
+            # Fall back to blackbox_api for any other case
+            from llm.blackbox import blackbox_api
+            return await blackbox_api(prompt, model="gpt-4o", chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
         
-        return str(response)
+        # If response is not a dict or is None, fall back to blackbox_api
+        from llm.blackbox import blackbox_api
+        return await blackbox_api(prompt, model="gpt-4o", chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
 
     except Exception as e:
         logger.error(f"Error in openai_chat: {e}")
-        return f"An error occurred while processing your request: {str(e)}"
+        # On any error, fall back to blackbox_api
+        from llm.blackbox import blackbox_api
+        return await blackbox_api(prompt, model="gpt-4o", chat_history_id=None, session_id=session_id, csrf_token=csrf_token)
 
 if __name__ == "__main__":
     async def main():
