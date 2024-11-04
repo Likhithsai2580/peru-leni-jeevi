@@ -265,6 +265,7 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
 
         full_prompt = f"{system_prompt}\n\nUser: {query}"
         
+        response = None
         if llm == "deepseek chat":
             response = await deepseek_api(full_prompt, thread_id, DEEPSEEK_API_KEY)
         elif llm == "coder":
@@ -280,12 +281,25 @@ async def get_llm_response(query: str, llm: str, chat_history: List[Tuple[str, s
         else:
             response = await openai_chat(full_prompt)
         
+        # Handle different response types
+        if isinstance(response, dict):
+            if 'content' in response:
+                response = response['content']
+            elif 'choices' in response and len(response['choices']) > 0:
+                response = response['choices'][0].get('message', {}).get('content', '')
+            else:
+                response = str(response)
+                
+        response = str(response).strip()
         return query, response
+        
     except Exception as e:
         logger.error(f"Error generating response: {e}")
         try:
             fallback_response = await openai_chat(f"{system_prompt}\n\nUser: {query}")
-            return query, fallback_response
+            if isinstance(fallback_response, dict):
+                fallback_response = fallback_response.get('content', str(fallback_response))
+            return query, str(fallback_response).strip()
         except Exception as e2:
             logger.error(f"Fallback also failed: {e2}")
             return query, f"I apologize, but I'm experiencing technical difficulties. Please try again later. Error: {str(e)}"

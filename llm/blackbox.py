@@ -166,6 +166,7 @@ if __name__ == "__main__":
         )
         async with bot:
             response = await bot.chat("how are you?","20241104_165000", model="claude-sonnet-3.5")
+            response = response.strip()
             print(response)
     
     asyncio.run(main())
