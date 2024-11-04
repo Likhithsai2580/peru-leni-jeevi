@@ -117,18 +117,17 @@ class BlackboxAI:
         try:
             async with self.session.post(endpoint, json=payload) as response:
                 if response.status == 200:
-                    response_received = False
+                    full_response = ""
                     async for line in response.content:
-                        if line and not response_received:
-                            response_received = True
-                            try:
-                                result = json.loads(line)
-                                self._save_chat_history(chat_history_id, message, result)
-                                return result
-                            except json.JSONDecodeError:
-                                decoded = line.decode('utf-8')
-                                self._save_chat_history(chat_history_id, message, decoded)
-                                return decoded
+                        if line:
+                            decoded = line.decode('utf-8')
+                            # Skip the search results section
+                            if decoded.startswith('$~~~$'):
+                                continue
+                            full_response += decoded
+                    
+                    self._save_chat_history(chat_history_id, message, full_response)
+                    return full_response.strip()
                 else:
                     print(f"Request failed with status code: {response.status}")
                     print(f"Response text: {await response.text()}")
@@ -157,7 +156,7 @@ if __name__ == "__main__":
             csrf_token=""# TODO: Add CSRF token
         )
         async with bot:
-            response = await bot.chat("Hello!")
+            response = await bot.chat("how are you?","20241104_165000", model="claude-sonnet-3.5")
             print(response)
     
     asyncio.run(main())
