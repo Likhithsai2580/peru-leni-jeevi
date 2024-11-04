@@ -5,7 +5,7 @@ import aiohttp
 import asyncio
 import logging
 from dotenv import load_dotenv
-
+from llm.blackbox import blackbox_api
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,10 @@ class OpenAI:
         top_p: float = 1,
         stream: bool = False,
         retry_attempts: int = 5,
-        retry_delay: float = 2.0
+        retry_delay: float = 2.0,
+        chat_history_id: str = None,
+        session_id: str = None,
+        csrf_token: str = None
     ) -> Union[Dict, str]:
         """
         Generate chat completions with retries and error handling.
@@ -138,17 +141,13 @@ class OpenAI:
                     if response.status == 500:
                         error_text = await response.text()
                         logger.error(f"Server error: {error_text}")
-                        if attempt < retry_attempts - 1:
-                            delay = retry_delay * (2 ** attempt)
-                            await asyncio.sleep(delay)
-                            continue
+
+                        return await blackbox_api(messages, "gpt-4o", chat_history_id, session_id, csrf_token)
                     elif response.status == 429:  # Rate limit
                         if attempt < retry_attempts - 1:
-                            delay = retry_delay * (2 ** attempt)
-                            await asyncio.sleep(delay)
-                            continue
+                            return await blackbox_api(messages, "gpt-4o", chat_history_id, session_id, csrf_token)
                     elif response.status == 404:
-                        return {"error": "Model not found or endpoint incorrect"}
+                        return await blackbox_api(messages, "gpt-4o", chat_history_id, session_id, csrf_token)
                     
                     return {
                         "error": f"Request failed with status {response.status}",
