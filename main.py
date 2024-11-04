@@ -56,11 +56,9 @@ os.makedirs(FRONTEND_DIR, exist_ok=True)
 
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK")
-CSRF_TOKEN = os.getenv("CSRF_TOKEN")
 PENTESTGPT_API_KEY = os.getenv("PENTESTGPT")
 BLACKBOX_SESSION_ID = os.getenv("SESSION_ID")
 BLACKBOX_CSRF_TOKEN = os.getenv("CSRF_TOKEN")
-
 # Summarization task
 async def summarize_chat_history(filepath: str) -> str:
     history = await load_chat_history(filepath)

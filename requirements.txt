@@ -12,3 +12,4 @@ nlpaug>=1.1.0
 googletrans==3.1.0a0
 torch>=1.9.0
 tf_keras
+sentencepiece>=0.1.96

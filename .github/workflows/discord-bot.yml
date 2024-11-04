@@ -35,5 +35,7 @@ jobs:
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DEEPSEEK: ${{ secrets.DEEPSEEK }}
-          COOKIES: ${{ secrets.COOKIES }}
+          CSRF_TOKEN: ${{ secrets.CSRF_TOKEN }}
+          PENTESTGPT: ${{ secrets.PENTESTGPT }}
+          SESSION_ID: ${{ secrets.SESSION_ID }}
         run: python main.py
