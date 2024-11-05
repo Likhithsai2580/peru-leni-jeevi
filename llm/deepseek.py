@@ -1,21 +1,28 @@
-import aiohttp
+import requests
 import json
 import os
-from typing import Optional
-from dotenv import load_dotenv
+from datetime import datetime
+from typing import Optional, Tuple
+import aiohttp
 import asyncio
 import logging
-
+from dotenv import load_dotenv
+import traceback
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-class DeepSeekAPI:
-    """A class to interact with the DeepSeek API for asynchronous chat sessions."""
-
-    def __init__(self, api_token: Optional[str] = os.environ.get("DEEPSEEK", "").strip()):
-        self.auth_headers = {'Authorization': f'Bearer {api_token}'}
-        self.api_base_url = 'https://chat.deepseek.com/api/v0/chat'
+class Deepseek:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://chat.deepseek.com/api/v0"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "x-app-version": "20241018.0"
+        }
+        self.history_dir = "chat_history"
         self.session: Optional[aiohttp.ClientSession] = None
+        os.makedirs(self.history_dir, exist_ok=True)
 
     async def __aenter__(self):
         await self.initialize()
@@ -26,85 +33,135 @@ class DeepSeekAPI:
 
     async def initialize(self):
         """Initialize the aiohttp session."""
-        self.session = aiohttp.ClientSession(headers=self.auth_headers)
+        self.session = aiohttp.ClientSession(headers=self.headers)
 
     async def close(self):
         """Close the aiohttp session."""
         if self.session:
             await self.session.close()
 
-    async def clear_chat(self) -> None:
-        """Clear the chat context."""
-        clear_payload = {"model_class": "deepseek_chat", "append_welcome_message": False}
-        async with self.session.post(f'{self.api_base_url}/clear_context', json=clear_payload) as response:
-            response.raise_for_status()
-
-    async def generate(self, user_message: str, response_temperature: float = 1.0, 
-                       model_type: str = "deepseek_chat", verbose: bool = False, 
-                       system_prompt: str = "Be Short & Concise") -> str:
-        """Generate a response from the DeepSeek API."""
-        request_payload = {
-            "message": f"[Instructions: {system_prompt}]\n\nUser Query:{user_message}",
-            "stream": True,
-            "model_preference": None,
-            "model_class": model_type,
-            "temperature": response_temperature
+    async def _create_chat_session(self) -> str:
+        create_session_url = f"{self.base_url}/chat_session/create"
+        create_session_payload = {
+            "code": 0,
+            "msg": "",
+            "data": {
+                "biz_code": 0,
+                "biz_msg": "",
+                "biz_data": {
+                    "id": "f3377b5b-de79-40de-809c-5892828f3b81",
+                    "seq_id": 19,
+                    "agent": "chat",
+                    "title": None,
+                    "version": 0,
+                    "current_message_id": None,
+                    "inserted_at": 1730696356.725656,
+                    "updated_at": 1730696356.725656
+                }
+            }
         }
 
-        combined_response = []
-        try:
-            async with self.session.post(f'{self.api_base_url}/completions', json=request_payload) as response:
-                response.raise_for_status()
-                async for chunk in response.content:
-                    if chunk:
-                        decoded_chunk = chunk.decode('utf-8').strip()
-                        if not decoded_chunk.startswith('data: '):
-                            if verbose:
-                                logger.debug(f"Unexpected chunk format: {decoded_chunk}")
-                            continue
+        async with self.session.post(create_session_url, json=create_session_payload) as response:
+            session_data = await response.json()
+            return session_data['data']['biz_data']['id']
 
-                        chunk_content = decoded_chunk.removeprefix('data: ')
-                        if chunk_content == '[DONE]':
-                            break
+    def _load_chat_history(self, chat_history_id: str) -> Tuple[Optional[str], Optional[str]]:
+        history_file = os.path.join(self.history_dir, f"{chat_history_id}.json")
+        if os.path.exists(history_file):
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+                messages = history.get('messages', [])
+                # Return session_id and last message_id if available
+                session_id = history.get('session_id')
+                parent_message_id = messages[-1]['message_id'] if messages else None
+                return session_id, parent_message_id
+        return None, None
 
+    def _save_chat_history(self, chat_history_id: str, prompt: str, response: str):
+        history_file = os.path.join(self.history_dir, f"{chat_history_id}.json")
+        
+        if os.path.exists(history_file):
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+        else:
+            history = {
+                'created_at': datetime.now().isoformat(),
+                'session_id': None,  # Will be updated when session is created
+                'messages': []
+            }
+
+        history['messages'].append({
+            'timestamp': datetime.now().isoformat(),
+            'message_id': None,  # This should be updated with the actual message_id
+            'prompt': prompt,
+            'response': response
+        })
+
+        with open(history_file, 'w') as f:
+            json.dump(history, f, indent=2)
+
+    async def chat(self, prompt: str, chat_history_id: Optional[str] = None) -> str:
+        # If no chat_history_id provided, create a new one based on timestamp
+        if not chat_history_id:
+            chat_history_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Try to load existing session or create new one
+        session_id, parent_message_id = self._load_chat_history(chat_history_id)
+        if not session_id:
+            session_id = await self._create_chat_session()
+
+        # Send message
+        chat_completion_url = f"{self.base_url}/chat/completion"
+        chat_completion_payload = {
+            "chat_session_id": session_id,
+            "parent_message_id": parent_message_id,
+            "prompt": prompt,
+            "ref_file_ids": []
+        }
+
+        full_response = ""
+        message_id = None
+
+        async with self.session.post(chat_completion_url, json=chat_completion_payload) as response:
+            async for line in response.content:
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    if decoded_line.startswith("data: "):
                         try:
-                            chunk_data = json.loads(chunk_content)
-                            delta = chunk_data['choices'][0].get('delta', {})
-                            if 'content' in delta:
-                                content = delta['content']
-                                combined_response.append(content)
-                                if verbose:
-                                    print(content, end='', flush=True)
-                            elif 'finish_reason' in delta:
-                                break
+                            json_data = json.loads(decoded_line[6:])
+                            if 'message_id' in json_data:
+                                message_id = json_data['message_id']
+                            if 'choices' in json_data and json_data['choices']:
+                                delta = json_data['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    content = delta['content']
+                                    full_response += content
                         except json.JSONDecodeError:
-                            logger.warning(f"Failed to decode JSON from chunk: {chunk}")
-                        except Exception as e:
-                            logger.error(f"Error processing chunk: {e}")
-        except aiohttp.ClientResponseError as e:
-            logger.error(f"HTTP error occurred: {e.status} {e.message}")
-            raise
-        except aiohttp.ClientError as e:
-            logger.error(f"Network error occurred: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {str(e)}")
-            raise
+                            traceback.print_exc()
+                            pass
 
-        if verbose:
-            print()  # Add a newline after the response
-        return ''.join(combined_response).strip()
+        # Save chat history
+        self._save_chat_history(chat_history_id, prompt, full_response)
+        
+        return full_response
 
-async def main():
-    async with DeepSeekAPI() as api:
-        while True:
-            user_query = input("\nYou: ")
-            if user_query.lower() == "/bye":
-                await api.clear_chat()
-                break
-            print("AI: ", end="", flush=True)
-            api_response_content = await api.generate(user_message=user_query, model_type='deepseek_code', verbose=False)
-            print(api_response_content)
+async def deepseek_api(prompt: str, chat_history_id: str = None, api_key: str = None):
+    if not api_key:
+        raise ValueError("API key is required")
+        
+    async with Deepseek(api_key) as deepseek:
+        response = await deepseek.chat(prompt, chat_history_id)
+        return response
 
 if __name__ == "__main__":
+    # Example usage
+    api_key = "" # TODO: Add API key
+    chat_history_id = "test_conversation"
+    
+    async def main():
+        while True:
+            prompt = input("You: ")
+            response = await deepseek_api(prompt, chat_history_id, api_key)
+            print(f"Assistant: {response}\n")
+            
     asyncio.run(main())
