@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const App: React.FC = () => {
@@ -6,6 +6,7 @@ const App: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<Array<string>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const sendMessage = useCallback(async () => {
     if (!message.trim()) return;
@@ -32,6 +33,12 @@ const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
   return (
     <div className="container mx-auto p-4 bg-gray-100 min-h-screen flex flex-col items-center justify-center">
       <h1 className="text-4xl font-bold mb-6">Peru Leni Jeevi Chat</h1>
@@ -56,7 +63,7 @@ const App: React.FC = () => {
       {error && (
         <div className="text-red-500 mb-4">{error}</div>
       )}
-      <div className="border border-gray-300 p-4 rounded w-full max-w-md bg-white shadow-lg overflow-y-auto max-h-[60vh]">
+      <div ref={chatContainerRef} className="border border-gray-300 p-4 rounded w-full max-w-md bg-white shadow-lg overflow-y-auto max-h-[60vh]">
         {chatHistory.map((item, index) => (
           <p key={index} className="mb-2 animate-fade-in">{item}</p>
         ))}
