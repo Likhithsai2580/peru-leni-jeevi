@@ -22,7 +22,7 @@ jobs:
       - name: Install and build frontend
         working-directory: ./frontend
         run: |
-          npm install
+          npm ci
           npm run build
 
       - name: Deploy to GitHub Pages
